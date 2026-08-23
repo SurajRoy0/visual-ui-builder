@@ -42,6 +42,8 @@ export interface DocumentSlice {
 
     future: HistoryEntry[];
 
+    loadProject: (project: Project) => void;
+
     mutate: (
         recipe: (draft: Project) => void
     ) => void;
@@ -84,6 +86,24 @@ export const createDocumentSlice: StateCreator<
         past: [],
 
         future: [],
+
+        // ========================================================
+        // Load Project
+        // ========================================================
+
+        loadProject: (project) => {
+            batchDepth = 0;
+            batchedPatches = [];
+            batchedInversePatches = [];
+            batchStartProject = null;
+            batchFailed = false;
+
+            set({
+                project,
+                past: [],
+                future: [],
+            });
+        },
 
         // ========================================================
         // Mutate

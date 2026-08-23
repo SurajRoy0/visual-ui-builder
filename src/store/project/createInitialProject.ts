@@ -10,7 +10,14 @@ import type {
 
 export const SCHEMA_VERSION = "1.0.0";
 
-export function createInitialProject(): Project {
+export interface CreateProjectOptions {
+    id?: ID;
+    name?: string;
+    description?: string;
+}
+
+export function createInitialProject(options: CreateProjectOptions = {}): Project {
+    const now = Date.now();
     const rootId: ID = "root";
     const pageId: ID = "page-home";
 
@@ -38,9 +45,15 @@ export function createInitialProject(): Project {
     };
 
     return {
-        id: "project-1",
+        id: options.id || "project-1",
 
-        name: "Untitled Project",
+        name: options.name || "Untitled Project",
+
+        description: options.description || "",
+
+        createdAt: now,
+
+        updatedAt: now,
 
         version: SCHEMA_VERSION,
 

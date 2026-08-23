@@ -1417,6 +1417,9 @@ export interface EditorState {
 export interface Project {
   id: ID;
   name: string;
+  description?: string;
+  createdAt?: number;
+  updatedAt?: number;
   /** Schema version. Bump on any future breaking change. */
   version: string;
   styles: ProjectStyles;
@@ -1431,3 +1434,25 @@ export interface Project {
   breakpoints: Breakpoint[];
   viewports: Viewport[];
 }
+
+// ============================================================
+// REPOSITORY INTERFACES
+// ============================================================
+
+export interface ProjectSummary {
+  id: ID;
+  name: string;
+  description?: string;
+  updatedAt: number;
+  createdAt?: number;
+  thumbnail?: string;
+}
+
+export interface ProjectRepository {
+  listProjects(): Promise<ProjectSummary[]>;
+  createProject(details: { name: string; description?: string }): Promise<Project>;
+  loadProject(id: ID): Promise<Project | null>;
+  saveProject(project: Project): Promise<void>;
+  deleteProject(id: ID): Promise<void>;
+}
+
