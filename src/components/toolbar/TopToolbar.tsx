@@ -17,8 +17,10 @@ import {
   Loader2,
   AlertCircle,
   Cloud,
+  HelpCircle,
 } from "lucide-react";
 import { useProjectStore } from "@/store/project";
+import { useEditorStore } from "@/store/editor";
 import type { SaveStatus } from "@/hooks/useAutosave";
 import Link from "next/link";
 
@@ -38,6 +40,7 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
 
   const projectName = useProjectStore((state) => state.project.name);
   const mutate = useProjectStore((state) => state.mutate);
+  const setIsHelpModalOpen = useEditorStore((state) => state.setIsHelpModalOpen);
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
@@ -156,8 +159,22 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
       {/* Center: Responsive Breakpoint Selector */}
       <BreakpointBar />
 
-      {/* Right: Mode Toggle, Theme Toggle, Export Button */}
+      {/* Right: Mode Toggle, Theme Toggle, Help, Export Button */}
       <div className="flex items-center gap-2">
+        {/* Help & Shortcuts Dialog */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={() => setIsHelpModalOpen(true)}
+              className="h-7.5 w-7.5 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <HelpCircle className="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Help & Shortcuts (?)</TooltipContent>
+        </Tooltip>
 
         {/* Theme Toggle */}
         <Tooltip>

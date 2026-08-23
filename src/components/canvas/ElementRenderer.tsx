@@ -85,12 +85,12 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
 
   const tag = elementNode.tag || "div";
 
-  // Common visual selection & outline classes
+  // Common visual selection & hover outline classes
   const outlineClass = isRoot
     ? ""
     : isSelected
-    ? "relative ring-2 ring-blue-500 ring-offset-1 z-10"
-    : "relative hover:outline hover:outline-1 hover:outline-blue-400/50 cursor-pointer";
+    ? "relative z-10"
+    : "relative hover:outline hover:outline-1 hover:outline-blue-400/40 cursor-pointer";
 
   // 1. Image Elements
   if (tag === "img") {

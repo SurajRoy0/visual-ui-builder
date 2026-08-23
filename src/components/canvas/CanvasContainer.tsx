@@ -19,6 +19,7 @@ import { DropIndicatorOverlay } from "./DropIndicatorOverlay";
 import { CanvasBar } from "./CanvasBar";
 import { useEditorStore } from "@/store/editor";
 import { useProjectStore } from "@/store/project";
+import { useEditorKeyboardShortcuts } from "@/hooks/useEditorKeyboardShortcuts";
 import {
   computeDropResult,
   getGlobalDraggedDefinition,
@@ -28,6 +29,9 @@ import {
 import type { ElementDefinitionItem } from "@/lib/elementDefinitions";
 
 export const CanvasContainer: React.FC = () => {
+  // Activate keyboard shortcuts (nudge, delete, duplicate, undo/redo)
+  useEditorKeyboardShortcuts();
+
   const zoom = useEditorStore((state) => state.zoom);
   const activeViewportId = useEditorStore((state) => state.activeViewportId);
   const activePageId = useEditorStore((state) => state.activePageId);
@@ -35,6 +39,10 @@ export const CanvasContainer: React.FC = () => {
   const setSelectedNodeId = useEditorStore((state) => state.setSelectedNodeId);
   const setViewportWidth = useEditorStore((state) => state.setViewportWidth);
   const setActiveBreakpointId = useEditorStore((state) => state.setActiveBreakpointId);
+  const canvasTool = useEditorStore((state) => state.canvasTool);
+  const isSpacePanning = useEditorStore((state) => state.isSpacePanning);
+
+  const isPanningActive = canvasTool === "pan" || isSpacePanning;
 
   const viewports = useProjectStore((state) => state.project.viewports);
   const breakpoints = useProjectStore((state) => state.project.breakpoints);
@@ -47,8 +55,10 @@ export const CanvasContainer: React.FC = () => {
   const updateNodeAttributes = useProjectStore((state) => state.updateNodeAttributes);
   const batch = useProjectStore((state) => state.batch);
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [isDraggingHandle, setIsDraggingHandle] = useState<"left" | "right" | null>(null);
+  const [isPanningInProgress, setIsPanningInProgress] = useState(false);
 
   // Transient drag-and-drop indicator state
   const [dropTarget, setDropTarget] = useState<DropTargetResult | null>(null);
@@ -61,10 +71,43 @@ export const CanvasContainer: React.FC = () => {
   const currentDisplayWidth = viewportWidth ?? activeViewport.width;
 
   const handleCanvasBackgroundClick = (e: React.MouseEvent) => {
-    // Only deselect if clicked directly on the backdrop area
-    if (e.target === e.currentTarget) {
+    // Only deselect if clicked directly on the backdrop area and not in pan mode
+    if (!isPanningActive && e.target === e.currentTarget) {
       setSelectedNodeId(null);
     }
+  };
+
+  // Canvas Pan Interaction (Hand tool / Spacebar drag)
+  const handlePanPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isPanningActive && e.button !== 1) return;
+    if (!scrollContainerRef.current) return;
+
+    e.preventDefault();
+    setIsPanningInProgress(true);
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startScrollLeft = scrollContainerRef.current.scrollLeft;
+    const startScrollTop = scrollContainerRef.current.scrollTop;
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      if (!scrollContainerRef.current) return;
+      const dx = moveEvent.clientX - startX;
+      const dy = moveEvent.clientY - startY;
+      scrollContainerRef.current.scrollLeft = startScrollLeft - dx;
+      scrollContainerRef.current.scrollTop = startScrollTop - dy;
+    };
+
+    const handlePointerUp = () => {
+      setIsPanningInProgress(false);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
   };
 
   // Helper to match breakpoint given a width
@@ -234,11 +277,19 @@ export const CanvasContainer: React.FC = () => {
 
       {/* Canvas Scroll Area */}
       <div
+        ref={scrollContainerRef}
+        onPointerDown={handlePanPointerDown}
         onClick={handleCanvasBackgroundClick}
-        className="flex-1 overflow-auto flex items-start justify-center p-8 relative"
+        className={`flex-1 overflow-auto flex items-start justify-center p-8 relative ${
+          isPanningActive
+            ? isPanningInProgress
+              ? "cursor-grabbing select-none"
+              : "cursor-grab select-none"
+            : ""
+        }`}
       >
         <div
-          className="relative flex flex-col items-center transition-transform duration-150 origin-top my-auto"
+          className="relative flex flex-col items-center origin-top my-auto"
           style={{
             transform: `scale(${zoom})`,
           }}
@@ -264,6 +315,7 @@ export const CanvasContainer: React.FC = () => {
             {/* Simulated Website Viewport Screen */}
             <div
               ref={viewportRef}
+              data-canvas-viewport="true"
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
@@ -271,13 +323,19 @@ export const CanvasContainer: React.FC = () => {
                 width: `${currentDisplayWidth}px`,
                 minHeight: `${activeViewport.height}px`,
               }}
-              className="relative shadow-2xl rounded-md overflow-hidden bg-background ring-1 ring-border flex flex-col transition-all duration-75"
+              className="relative shadow-2xl rounded-md bg-background ring-1 ring-border flex flex-col"
             >
               {/* Live Canvas Document Tree */}
-              <CanvasRenderer />
+              <div
+                className={`w-full min-h-full flex-1 flex flex-col rounded-md overflow-hidden ${
+                  isPanningActive ? "pointer-events-none select-none" : ""
+                }`}
+              >
+                <CanvasRenderer />
+              </div>
 
               {/* Selection & Resize Overlay */}
-              <SelectionOverlay />
+              {!isPanningActive && <SelectionOverlay />}
 
               {/* Live Drag & Drop Indicator Overlay */}
               <DropIndicatorOverlay

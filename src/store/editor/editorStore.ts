@@ -19,6 +19,9 @@ export interface EditorStoreActions {
     resetZoom: () => void;
     setGrid: (grid: Partial<EditorState["grid"]>) => void;
     setMode: (mode: EditorState["mode"]) => void;
+    setCanvasTool: (tool: "select" | "pan") => void;
+    setIsSpacePanning: (isPanning: boolean) => void;
+    setIsHelpModalOpen: (isOpen: boolean) => void;
     setActiveTimelineId: (timelineId: ID | null) => void;
     setPlayheadSeconds: (seconds: number) => void;
     resetEditorState: () => void;
@@ -26,9 +29,17 @@ export interface EditorStoreActions {
 
 export type EditorStore = EditorState & {
     viewportWidth: number | null;
+    canvasTool: "select" | "pan";
+    isSpacePanning: boolean;
+    isHelpModalOpen: boolean;
 } & EditorStoreActions;
 
-export const initialEditorState: EditorState & { viewportWidth: number | null } = {
+export const initialEditorState: EditorState & {
+    viewportWidth: number | null;
+    canvasTool: "select" | "pan";
+    isSpacePanning: boolean;
+    isHelpModalOpen: boolean;
+} = {
     selectedNodeId: null,
     inspectedComponentInstanceId: null,
     inspectedComponentNodeId: null,
@@ -37,6 +48,9 @@ export const initialEditorState: EditorState & { viewportWidth: number | null } 
     activeViewportId: "vp-desktop",
     viewportWidth: null,
     zoom: 1,
+    canvasTool: "select",
+    isSpacePanning: false,
+    isHelpModalOpen: false,
     grid: {
         visible: false,
         snap: false,
@@ -96,6 +110,12 @@ export const useEditorStore = create<EditorStore>()((set) => ({
         })),
 
     setMode: (mode) => set({ mode }),
+
+    setCanvasTool: (canvasTool) => set({ canvasTool }),
+
+    setIsSpacePanning: (isSpacePanning) => set({ isSpacePanning }),
+
+    setIsHelpModalOpen: (isHelpModalOpen) => set({ isHelpModalOpen }),
 
     setActiveTimelineId: (timelineId) =>
         set({

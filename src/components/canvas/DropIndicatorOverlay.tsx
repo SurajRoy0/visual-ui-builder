@@ -33,7 +33,7 @@ export const DropIndicatorOverlay: React.FC<DropIndicatorOverlayProps> = ({
   if (indicator.type === "box") {
     return (
       <div
-        className="absolute inset-0 pointer-events-none z-50 overflow-hidden"
+        className="absolute inset-0 pointer-events-none z-50 overflow-visible"
         style={{ width: "100%", height: "100%" }}
       >
         <div
@@ -79,7 +79,7 @@ export const DropIndicatorOverlay: React.FC<DropIndicatorOverlayProps> = ({
 
   return (
     <div
-      className="absolute inset-0 pointer-events-none z-50 overflow-hidden"
+      className="absolute inset-0 pointer-events-none z-50 overflow-visible"
       style={{ width: "100%", height: "100%" }}
     >
       {/* Insertion line */}

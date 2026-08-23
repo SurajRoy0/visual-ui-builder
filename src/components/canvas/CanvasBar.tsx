@@ -7,9 +7,12 @@ import {
   RotateCcw,
   Undo2,
   Redo2,
+  MousePointer2,
+  Hand,
 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEditorStore } from "@/store/editor";
 import { useProjectStore } from "@/store/project";
 
@@ -19,6 +22,9 @@ export const CanvasBar: React.FC = () => {
   const resetZoom = useEditorStore((state) => state.resetZoom);
   const activeViewportId = useEditorStore((state) => state.activeViewportId);
   const viewportWidth = useEditorStore((state) => state.viewportWidth);
+  const canvasTool = useEditorStore((state) => state.canvasTool);
+  const setCanvasTool = useEditorStore((state) => state.setCanvasTool);
+  const isSpacePanning = useEditorStore((state) => state.isSpacePanning);
 
   const viewports = useProjectStore((state) => state.project.viewports);
   const undo = useProjectStore((state) => state.undo);
@@ -42,11 +48,44 @@ export const CanvasBar: React.FC = () => {
 
   const zoomPercent = Math.round(zoom * 100);
 
+  const isPanningActive = canvasTool === "pan" || isSpacePanning;
+
   return (
     <div className="flex items-center justify-between px-3 py-1.5 text-xs border-b border-border z-20 bg-background/95 backdrop-blur-sm text-foreground select-none">
-      {/* Viewport Info */}
-      <div className="flex items-center gap-1.5">
-        <span className="font-mono text-xs font-semibold text-foreground px-1">
+      {/* Left: Tool Switcher Tabs & Viewport Info */}
+      <div className="flex items-center gap-2.5">
+        {/* Select & Pan Tool Switcher Tabs */}
+        <Tabs
+          value={isPanningActive ? "pan" : "select"}
+          onValueChange={(val) => {
+            if (val === "select" || val === "pan") {
+              setCanvasTool(val);
+            }
+          }}
+        >
+          <TabsList className="h-7.5 p-0.5 bg-secondary/50 border border-border">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="select" className="h-6.5 w-6.5 p-0 cursor-pointer">
+                  <MousePointer2 className="size-3.5" />
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Select Tool (V)</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <TabsTrigger value="pan" className="h-6.5 w-6.5 p-0 cursor-pointer">
+                  <Hand className="size-3.5" />
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Hand / Pan Tool (H or hold Space)</TooltipContent>
+            </Tooltip>
+          </TabsList>
+        </Tabs>
+
+        {/* Viewport Info */}
+        <span className="font-mono text-xs font-semibold text-foreground px-1 hidden sm:inline">
           <span className="font-light text-muted-foreground">Viewport: </span>
           {displayWidth}px × {activeViewport.height}px
         </span>

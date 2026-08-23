@@ -8,7 +8,9 @@ import { RightSidebar } from "./sidebar-right/RightSidebar";
 import { JsonModal } from "./modals/JsonModal";
 import { ConfirmDeleteDialog } from "./modals/ConfirmDeleteDialog";
 import { ProjectsManagerModal } from "./modals/ProjectsManagerModal";
+import { HelpModal } from "./modals/HelpModal";
 import { useProjectStore } from "@/store/project";
+import { useEditorStore } from "@/store/editor";
 import { useAutosave } from "@/hooks/useAutosave";
 import { getProjectRepository } from "@/lib/repository/projectRepository";
 import type { ID } from "@/types/project";
@@ -26,6 +28,8 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialProjectId }) 
 
   const currentProjectId = useProjectStore((state) => state.project.id);
   const loadProject = useProjectStore((state) => state.loadProject);
+  const isHelpModalOpen = useEditorStore((state) => state.isHelpModalOpen);
+  const setIsHelpModalOpen = useEditorStore((state) => state.setIsHelpModalOpen);
 
   const { status: saveStatus, saveNow } = useAutosave({ debounceMs: 600 });
   const repository = getProjectRepository();
@@ -160,6 +164,10 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ initialProjectId }) 
         onClose={() => setIsProjectsModalOpen(false)}
         currentProjectId={currentProjectId}
         onSelectProject={handleSelectProject}
+      />
+      <HelpModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
       />
     </div>
   );

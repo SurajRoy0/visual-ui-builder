@@ -137,18 +137,6 @@ export function computeDropResult({
   const isHitVoid = isVoidElement(hitNode.tag);
   const isHitEmptyContainer = hitNode.children.length === 0 && !isHitVoid;
 
-  // Determine if parent is flex row
-  const parentNode = hitNode.parentId ? (elements[hitNode.parentId] as ElementNode | undefined) : null;
-  const isParentFlexRow = parentNode?.type === "element" && parentNode.style?.flexDirection === "row";
-
-  // Check if hit element should receive "inside" mode:
-  // - Hit is root
-  // - Hit is an empty container
-  // - Pointer is within inner 40% margin of a container with children
-  const relRect = getRelativeElementRect(hit.rect, containerRect, safeZoom);
-  const relPointerX = (clientX - hit.rect.left) / safeZoom;
-  const relPointerY = (clientY - hit.rect.top) / safeZoom;
-
   const isContainerTag = [
     "div",
     "section",
@@ -165,8 +153,41 @@ export function computeDropResult({
     "figure",
   ].includes(hitNode.tag);
 
-  // When to drop INSIDE the hit node:
-  if (isHitRoot || isHitEmptyContainer || (isContainerTag && hitNode.children.length === 0)) {
+  // Check parent or container layout orientation (flex row vs column / block)
+  const parentNode = hitNode.parentId ? (elements[hitNode.parentId] as ElementNode | undefined) : null;
+  
+  const checkIsFlexRow = (node: ElementNode | null | undefined, dom: HTMLElement | null): boolean => {
+    if (!node) return false;
+    const style = node.style || {};
+    if (style.flexDirection === "column" || style.flexDirection === "column-reverse") return false;
+    if (style.flexDirection === "row" || style.flexDirection === "row-reverse") return true;
+    if (style.display === "flex" || style.display === "inline-flex") return true;
+    if (dom && typeof window !== "undefined") {
+      try {
+        const computed = window.getComputedStyle(dom);
+        if (
+          (computed.display === "flex" || computed.display === "inline-flex") &&
+          !computed.flexDirection.includes("column")
+        ) {
+          return true;
+        }
+      } catch {
+        // Fallback
+      }
+    }
+    return false;
+  };
+
+  const isParentFlexRow = checkIsFlexRow(parentNode, hit.dom.parentElement);
+
+  const relRect = getRelativeElementRect(hit.rect, containerRect, safeZoom);
+  const relPointerX = (clientX - hit.rect.left) / safeZoom;
+  const relPointerY = (clientY - hit.rect.top) / safeZoom;
+
+  // When hit node is a container:
+  // If it's root, or empty, or pointer is directly on container without hitting a child directly,
+  // allow dropping INSIDE the container.
+  if (isHitRoot || isHitEmptyContainer || (isContainerTag && hit.dom === matchingDomElements[0].dom && hitNode.children.length === 0)) {
     const validation = canDropElementIntoParent(draggedItem, hitNode);
     return {
       allowed: validation.allowed,
@@ -183,6 +204,34 @@ export function computeDropResult({
         height: Math.max(30, relRect.height - 4),
       },
     };
+  }
+
+  // When hit node is a container with children and cursor is near the edge/empty area of the container
+  if (isContainerTag && !isHitVoid && hitNode.children.length > 0) {
+    const isInnerContainerFlexRow = checkIsFlexRow(hitNode, hit.dom);
+    const isAtEnd = isInnerContainerFlexRow
+      ? relPointerX > relRect.width * 0.75
+      : relPointerY > relRect.height * 0.75;
+
+    // If cursor is deep inside the container (not directly hovering an existing child's tight bounds)
+    if (isAtEnd) {
+      const validation = canDropElementIntoParent(draggedItem, hitNode);
+      return {
+        allowed: validation.allowed,
+        reason: validation.reason,
+        parentId: hitNode.id,
+        index: hitNode.children.length,
+        mode: "inside",
+        targetNodeId: hitNode.id,
+        indicator: {
+          type: "box",
+          left: relRect.left + 2,
+          top: relRect.top + 2,
+          width: Math.max(30, relRect.width - 4),
+          height: Math.max(30, relRect.height - 4),
+        },
+      };
+    }
   }
 
   // When hit node is a sibling inside a parent:
