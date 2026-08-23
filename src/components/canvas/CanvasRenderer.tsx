@@ -2,22 +2,27 @@
 
 import React, { useState } from "react";
 import {
-  Sparkles,
   Square,
   Type,
   Layout,
-  MousePointer2,
   Plus,
-  ArrowRight,
   Command,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+interface CanvasQuickElement {
+  id: string;
+  type: "box" | "text" | "section";
+  name: string;
+  tag: string;
+  content?: string;
+}
+
 export const CanvasRenderer: React.FC = () => {
-  const [elements, setElements] = useState<any[]>([]);
+  const [elements, setElements] = useState<CanvasQuickElement[]>([]);
 
   const handleAddQuickElement = (type: "box" | "text" | "section") => {
-    const newEl = {
+    const newEl: CanvasQuickElement = {
       id: `element-${Date.now()}`,
       type,
       name: type === "box" ? "Box Container" : type === "text" ? "Headline Text" : "Hero Section",
@@ -30,23 +35,25 @@ export const CanvasRenderer: React.FC = () => {
   return (
     <div
       id="root-page"
-      className="relative flex flex-col items-center justify-center w-full min-h-[750px] p-8 bg-background text-foreground select-none"
+      className="relative flex flex-col items-center justify-center w-full min-h-188 p-8 bg-background text-foreground select-none"
     >
       {elements.length === 0 ? (
         /* Empty State / Welcome Screen */
-        <div className="relative flex flex-col items-center justify-center text-center max-w-md p-8 rounded-2xl border border-border/80 bg-card/60 backdrop-blur-xs shadow-xl space-y-6">
+        <div className="relative flex flex-col items-center justify-center text-center max-w-md p-8 rounded-md border border-border/80 bg-card/60 backdrop-blur-xs shadow-xl space-y-6">
           {/* Glowing Aura & Icon */}
           <div className="relative">
-            <div className="absolute -inset-2 bg-gradient-to-r from-blue/20 via-purple-500/20 to-pink-500/20 rounded-full blur-md" />
-            <div className="relative w-14 h-14 rounded-2xl bg-secondary border border-border flex items-center justify-center text-foreground shadow-sm">
-              <Sparkles className="size-6 text-blue animate-pulse" />
+            <div className="absolute -inset-3 bg-linear-to-r from-blue-500/25 via-purple-500/25 to-pink-500/25 rounded-3xl blur-xl" />
+            <div className="relative w-14 h-14 rounded-lg bg-linear-to-b from-secondary to-secondary/60 border border-border/90 flex items-center justify-center shadow-md">
+              <span className="font-black text-2xl bg-linear-to-br from-blue-500 via-indigo-500 to-pink-500 bg-clip-text text-transparent select-none tracking-tighter">
+                P
+              </span>
             </div>
           </div>
 
           {/* Welcome Titles */}
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-secondary/80 border border-border text-[11px] font-medium text-muted-foreground">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-linear-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 border border-border/80 text-xs font-medium text-foreground">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
               Canvas Ready
             </div>
             <h2 className="text-xl font-bold tracking-tight text-foreground">
@@ -58,12 +65,12 @@ export const CanvasRenderer: React.FC = () => {
           </div>
 
           {/* Quick Insert Actions */}
-          <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+          <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
             <Button
               variant="outline"
               size="sm"
               onClick={() => handleAddQuickElement("box")}
-              className="h-8 text-xs gap-1.5 px-3 rounded-lg cursor-pointer hover:bg-secondary border-border hover:border-foreground/30 shadow-2xs"
+              className="h-8 text-xs font-medium gap-1.5 px-3 rounded-md cursor-pointer bg-linear-to-r from-blue-500/10 to-indigo-500/10 hover:from-blue-500/20 hover:to-indigo-500/20 border-blue-500/30 text-foreground shadow-2xs"
             >
               <Square className="size-3.5 text-blue" />
               <span>Add Box</span>
@@ -73,9 +80,9 @@ export const CanvasRenderer: React.FC = () => {
               variant="outline"
               size="sm"
               onClick={() => handleAddQuickElement("text")}
-              className="h-8 text-xs gap-1.5 px-3 rounded-lg cursor-pointer hover:bg-secondary border-border hover:border-foreground/30 shadow-2xs"
+              className="h-8 text-xs font-medium gap-1.5 px-3 rounded-md cursor-pointer bg-linear-to-r from-purple-500/10 to-pink-500/10 hover:from-purple-500/20 hover:to-pink-500/20 border-purple-500/30 text-foreground shadow-2xs"
             >
-              <Type className="size-3.5 text-purple-500" />
+              <Type className="size-3.5 text-purple-400" />
               <span>Add Text</span>
             </Button>
 
@@ -83,9 +90,9 @@ export const CanvasRenderer: React.FC = () => {
               variant="outline"
               size="sm"
               onClick={() => handleAddQuickElement("section")}
-              className="h-8 text-xs gap-1.5 px-3 rounded-lg cursor-pointer hover:bg-secondary border-border hover:border-foreground/30 shadow-2xs"
+              className="h-8 text-xs font-medium gap-1.5 px-3 rounded-md cursor-pointer bg-linear-to-r from-emerald-500/10 to-teal-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 border-emerald-500/30 text-foreground shadow-2xs"
             >
-              <Layout className="size-3.5 text-emerald-500" />
+              <Layout className="size-3.5 text-emerald-400" />
               <span>Add Section</span>
             </Button>
           </div>

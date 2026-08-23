@@ -176,15 +176,15 @@ export const GlobalStylesInspector: React.FC = () => {
       {(filteredColors.length > 0 || !q) && (
         <section className="p-3.5 space-y-2.5 border-b border-border/50">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground tracking-tight">
-              <Palette className="size-4 text-blue" />
+            <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground tracking-tight">
+              <Palette className="size-4 text-indigo-400" />
               <span>Color Palette Tokens</span>
             </div>
             <Button
-              variant="ghost"
+              variant="outline"
               size="xs"
               onClick={() => setIsAddingColor(!isAddingColor)}
-              className="h-6 text-xs font-medium gap-1 px-2 text-muted-foreground hover:text-foreground cursor-pointer"
+              className="h-6 text-xs font-medium gap-1 px-2 rounded-md bg-gradient-to-r from-blue-500/10 to-indigo-500/10 hover:from-blue-500/20 hover:to-indigo-500/20 border-blue-500/20 text-blue-400 cursor-pointer shadow-2xs"
             >
               <Plus className="size-3.5" />
               Add
@@ -193,7 +193,7 @@ export const GlobalStylesInspector: React.FC = () => {
 
           {/* New Color Token Form */}
           {isAddingColor && (
-            <div className="p-2.5 rounded-md bg-secondary/50 border border-border space-y-2">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-secondary/60 via-secondary/30 to-blue-500/5 border border-border/80 space-y-2.5 shadow-xs">
               <div className="flex items-center gap-2">
                 <Input
                   value={newColorKey}
@@ -205,7 +205,7 @@ export const GlobalStylesInspector: React.FC = () => {
                   type="color"
                   value={newColorVal}
                   onChange={(e) => setNewColorVal(e.target.value)}
-                  className="w-8 h-8 rounded border border-border cursor-pointer bg-transparent"
+                  className="w-8 h-8 rounded-lg border border-border cursor-pointer bg-transparent shadow-2xs"
                 />
               </div>
               <div className="flex justify-end gap-1.5">
@@ -221,7 +221,7 @@ export const GlobalStylesInspector: React.FC = () => {
                   variant="default"
                   size="xs"
                   onClick={handleAddColor}
-                  className="h-7 text-xs font-medium gap-1"
+                  className="h-7 text-xs font-medium gap-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-xs"
                 >
                   <Check className="size-3.5" /> Save Token
                 </Button>
@@ -360,15 +360,15 @@ export const GlobalStylesInspector: React.FC = () => {
       {(filteredVars.length > 0 || !q) && (
         <section className="p-3.5 space-y-2.5 border-b border-border/50">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground tracking-tight">
-              <Code2 className="size-4 text-blue" />
+            <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground tracking-tight">
+              <Code2 className="size-4 text-cyan-400" />
               <span>Project CSS Variables</span>
             </div>
             <Button
-              variant="ghost"
+              variant="outline"
               size="xs"
               onClick={() => setIsAddingVar(!isAddingVar)}
-              className="h-6 text-xs font-medium gap-1 px-2 text-muted-foreground hover:text-foreground cursor-pointer"
+              className="h-6 text-xs font-medium gap-1 px-2 rounded-md bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/20 hover:to-blue-500/20 border-cyan-500/20 text-cyan-400 cursor-pointer shadow-2xs"
             >
               <Plus className="size-3.5" />
               Add
@@ -377,18 +377,18 @@ export const GlobalStylesInspector: React.FC = () => {
 
           {/* New Variable Form */}
           {isAddingVar && (
-            <div className="p-2.5 rounded-md bg-secondary/50 border border-border space-y-2">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-secondary/60 via-secondary/30 to-cyan-500/5 border border-border/80 space-y-2.5 shadow-xs">
               <Input
                 value={newVarKey}
                 onChange={(e) => setNewVarKey(e.target.value)}
                 placeholder="--var-name (e.g. --brand-glow)"
-                className="h-8 text-xs"
+                className="h-8 text-xs font-mono"
               />
               <Input
                 value={newVarVal}
                 onChange={(e) => setNewVarVal(e.target.value)}
                 placeholder="CSS Value (e.g. 0 0 20px #3b82f6)"
-                className="h-8 text-xs"
+                className="h-8 text-xs font-mono"
               />
               <div className="flex justify-end gap-1.5">
                 <Button
@@ -403,7 +403,7 @@ export const GlobalStylesInspector: React.FC = () => {
                   variant="default"
                   size="xs"
                   onClick={handleAddVar}
-                  className="h-7 text-xs font-medium gap-1"
+                  className="h-7 text-xs font-medium gap-1 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-xs"
                 >
                   <Check className="size-3.5" /> Save Variable
                 </Button>

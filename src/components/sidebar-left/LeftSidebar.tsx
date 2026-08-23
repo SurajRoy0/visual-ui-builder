@@ -20,10 +20,10 @@ export const LeftSidebar: React.FC = () => {
   const [activeTab, setActiveTab] = useState<LeftTab>("elements");
 
   const tabs: { id: LeftTab; label: string; icon: React.ReactNode }[] = [
-    { id: "elements", label: "Elements", icon: <PlusSquare className="size-4" /> },
-    { id: "layers", label: "Layers", icon: <Layers className="size-4" /> },
-    { id: "assets", label: "Assets", icon: <ImageIcon className="size-4" /> },
-    { id: "components", label: "Components", icon: <Component className="size-4" /> },
+    { id: "elements", label: "Elements", icon: <PlusSquare className="size-4 text-sky-500" /> },
+    { id: "layers", label: "Layers", icon: <Layers className="size-4 text-violet-500" /> },
+    { id: "assets", label: "Assets", icon: <ImageIcon className="size-4 text-pink-500" /> },
+    { id: "components", label: "Components", icon: <Component className="size-4 text-emerald-500" /> },
   ];
 
   return (

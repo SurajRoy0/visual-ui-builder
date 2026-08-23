@@ -21,8 +21,8 @@ export const RightSidebar: React.FC = () => {
   const selectedItemLabel = selectedNode?.name || "Box";
 
   const tabs: { id: RightTab; label: string; icon: React.ReactNode }[] = [
-    { id: "element", label: selectedItemLabel, icon: <Sliders className="size-4" /> },
-    { id: "global", label: "Global", icon: <Globe className="size-4" /> },
+    { id: "element", label: selectedItemLabel, icon: <Sliders className="size-4 text-indigo-400" /> },
+    { id: "global", label: "Global", icon: <Globe className="size-4 text-amber-400" /> },
   ];
 
   return (

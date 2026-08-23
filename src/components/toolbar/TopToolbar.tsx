@@ -31,8 +31,13 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
       <div className="flex items-center gap-2.5">
         {/* Brand Logo */}
         <div className="flex items-center gap-2 pr-2.5 border-r border-border">
-          <div className="w-7 h-7 rounded-md bg-foreground text-background flex items-center justify-center font-bold text-xs shadow-xs">
-            P
+          <div className="relative">
+            <div className="absolute -inset-1.5 bg-linear-to-r from-blue-500/25 via-purple-500/25 to-pink-500/25 rounded-xl blur-xs" />
+            <div className="relative w-7 h-7 rounded-md bg-linear-to-b from-secondary to-secondary/60 border border-border/90 flex items-center justify-center shadow-sm">
+              <span className="font-black text-xs bg-linear-to-br from-blue-500 via-indigo-500 to-pink-500 bg-clip-text text-transparent select-none tracking-tighter">
+                P
+              </span>
+            </div>
           </div>
         </div>
 

@@ -180,13 +180,14 @@ export const LayersTab: React.FC = () => {
   const getNodeIcon = (type: DummyLayerNode["type"]) => {
     switch (type) {
       case "text":
-        return <Type className="size-3.5" />;
+        return <Type className="size-3.5 text-purple-400" />;
       case "section":
-        return <LayersIcon className="size-3.5" />;
+        return <LayersIcon className="size-3.5 text-sky-400" />;
       case "button":
+        return <Square className="size-3.5 text-amber-400" />;
       case "box":
       default:
-        return <Square className="size-3.5" />;
+        return <Square className="size-3.5 text-blue-400" />;
     }
   };
 
@@ -202,10 +203,11 @@ export const LayersTab: React.FC = () => {
         <div
           onClick={() => setSelectedLayerId(node.id)}
           style={{ paddingLeft: `${depth * 14 + 8}px` }}
-          className={`group flex items-center justify-between py-1.5 pr-2 rounded-md text-xs cursor-pointer select-none transition-all ${isSelected
-              ? "bg-[#242428] text-white dark:bg-[#242428] dark:text-white bg-[#ebebed] text-zinc-950 font-medium shadow-2xs"
-              : "text-muted-foreground hover:text-foreground hover:bg-white/6 dark:hover:bg-white/6 hover:bg-black/4"
-            } ${isHidden ? "opacity-40" : ""}`}
+          className={`group flex items-center justify-between py-1.5 pr-2 rounded-md text-xs cursor-pointer select-none border transition-colors duration-150 ${
+            isSelected
+              ? "bg-gradient-to-r from-blue-500/15 via-indigo-500/10 to-transparent border-blue-500/30 text-foreground font-medium shadow-2xs"
+              : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+          } ${isHidden ? "opacity-40" : ""}`}
         >
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
             {hasChildren ? (
@@ -217,8 +219,7 @@ export const LayersTab: React.FC = () => {
                   e.stopPropagation();
                   toggleCollapse(node.id);
                 }}
-                className={`h-4 w-4 p-0 rounded-md cursor-pointer hover:bg-white/8 ${isSelected ? "text-white dark:text-white text-zinc-950" : "text-muted-foreground"
-                  }`}
+                className="h-4 w-4 p-0 rounded-md cursor-pointer text-muted-foreground hover:text-foreground"
               >
                 {isCollapsed ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
               </Button>
@@ -226,20 +227,18 @@ export const LayersTab: React.FC = () => {
               <span className="w-3" />
             )}
 
-            <div
-              className={`p-0.5 rounded-md ${isSelected ? "text-white dark:text-white text-zinc-950" : "text-muted-foreground"
-                }`}
-            >
+            <div className="p-0.5 rounded-md">
               {getNodeIcon(node.type)}
             </div>
 
             <span className="truncate text-xs font-medium text-foreground">{node.name}</span>
 
             <span
-              className={`text-[10px] font-mono font-medium uppercase px-1.5 py-0.5 rounded-md shrink-0 opacity-70 ${isSelected
-                  ? "bg-white/16 dark:bg-white/16 bg-black/10 text-foreground font-semibold"
-                  : "bg-secondary text-muted-foreground"
-                }`}
+              className={`text-[10px] font-mono font-medium uppercase px-1.5 py-0.5 rounded-md shrink-0 opacity-70 ${
+                isSelected
+                  ? "bg-secondary text-foreground font-semibold"
+                  : "bg-secondary/60 text-muted-foreground"
+              }`}
             >
               {node.tag}
             </span>
@@ -258,10 +257,7 @@ export const LayersTab: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  className={`h-5 w-5 p-0 rounded-md ${isSelected
-                      ? "hover:bg-white/12 text-white dark:text-white text-zinc-950"
-                      : "hover:text-foreground hover:bg-white/8 text-muted-foreground"
-                    }`}
+                  className="h-5 w-5 p-0 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary"
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleHidden(node.id);
@@ -279,10 +275,7 @@ export const LayersTab: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  className={`h-5 w-5 p-0 rounded-md ${isSelected
-                      ? "hover:bg-white/12 text-white dark:text-white text-zinc-950"
-                      : "hover:text-foreground hover:bg-white/8 text-muted-foreground"
-                    }`}
+                  className="h-5 w-5 p-0 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary"
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleLocked(node.id);
@@ -300,10 +293,7 @@ export const LayersTab: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  className={`h-5 w-5 p-0 rounded-md ${isSelected
-                      ? "hover:bg-white/12 text-white dark:text-white text-zinc-950"
-                      : "hover:text-foreground hover:bg-white/8 text-muted-foreground"
-                    }`}
+                  className="h-5 w-5 p-0 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Copy className="size-3" />
@@ -318,10 +308,7 @@ export const LayersTab: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  className={`h-5 w-5 p-0 rounded-md ${isSelected
-                      ? "hover:bg-white/12 text-white dark:text-white text-zinc-950"
-                      : "hover:text-foreground hover:bg-white/8 text-muted-foreground"
-                    }`}
+                  className="h-5 w-5 p-0 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Trash2 className="size-3" />
@@ -379,16 +366,17 @@ export const LayersTab: React.FC = () => {
             <div
               key={page.id}
               onClick={() => setActivePage(page.id)}
-              className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-all ${activePage === page.id
-                  ? "bg-[#242428] text-white dark:bg-[#242428] dark:text-white bg-[#ebebed] text-zinc-950 font-medium shadow-2xs"
-                  : "text-muted-foreground hover:text-foreground hover:bg-white/6 dark:hover:bg-white/6 hover:bg-black/4"
-                }`}
+              className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer border transition-colors duration-150 ${
+                activePage === page.id
+                  ? "bg-gradient-to-r from-blue-500/15 via-indigo-500/10 to-transparent border-blue-500/30 text-foreground font-medium shadow-2xs"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+              }`}
             >
               <div className="flex items-center gap-2">
                 <span
                   className={
                     activePage === page.id
-                      ? "text-white dark:text-white text-zinc-950"
+                      ? "text-blue-500"
                       : "text-muted-foreground"
                   }
                 >
