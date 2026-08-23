@@ -32,6 +32,8 @@ export default function ProjectsDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
+  console.log(projects, "projects @@")
+
   // Deletion state
   const [projectToDelete, setProjectToDelete] = useState<ProjectSummary | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -53,7 +55,7 @@ export default function ProjectsDashboardPage() {
 
   useEffect(() => {
     let isSubscribed = true;
-
+    console.log(repository, "repository @@")
     repository
       .listProjects()
       .then((list) => {

@@ -10,20 +10,50 @@ import {
 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import { useEditorStore } from "@/store/editor";
+import { useProjectStore } from "@/store/project";
 
 export const CanvasBar: React.FC = () => {
+  const zoom = useEditorStore((state) => state.zoom);
+  const setZoom = useEditorStore((state) => state.setZoom);
+  const resetZoom = useEditorStore((state) => state.resetZoom);
+  const activeViewportId = useEditorStore((state) => state.activeViewportId);
+  const viewportWidth = useEditorStore((state) => state.viewportWidth);
+
+  const viewports = useProjectStore((state) => state.project.viewports);
+  const undo = useProjectStore((state) => state.undo);
+  const redo = useProjectStore((state) => state.redo);
+  const canUndo = useProjectStore((state) => state.past.length > 0);
+  const canRedo = useProjectStore((state) => state.future.length > 0);
+
+  const activeViewport =
+    viewports.find((v) => v.id === activeViewportId) ||
+    viewports[0] || { width: 1440, height: 900, name: "Desktop" };
+
+  const displayWidth = viewportWidth ?? activeViewport.width;
+
+  const handleZoomOut = () => {
+    setZoom((prev) => Math.max(0.25, Math.round((prev - 0.1) * 100) / 100));
+  };
+
+  const handleZoomIn = () => {
+    setZoom((prev) => Math.min(2.0, Math.round((prev + 0.1) * 100) / 100));
+  };
+
+  const zoomPercent = Math.round(zoom * 100);
 
   return (
-    <div className="flex items-center justify-between px-1 py-1.5 text-xs border-b border-border z-20 bg-background/95 backdrop-blur-sm text-foreground">
-      {/* Viewport Width */}
+    <div className="flex items-center justify-between px-3 py-1.5 text-xs border-b border-border z-20 bg-background/95 backdrop-blur-sm text-foreground select-none">
+      {/* Viewport Info */}
       <div className="flex items-center gap-1.5">
         <span className="font-mono text-xs font-semibold text-foreground px-1">
-          <span className="font-light">Viewport: </span>12OOpx x 75Opx
+          <span className="font-light text-muted-foreground">Viewport: </span>
+          {displayWidth}px × {activeViewport.height}px
         </span>
       </div>
-      {/* Left: Viewport info + Zoom & Undo/Redo */}
-      <div className="flex items-center gap-2 min-w-0">
 
+      {/* Right Controls: Undo/Redo & Zoom Controls */}
+      <div className="flex items-center gap-2 min-w-0">
         {/* Undo / Redo */}
         <div className="flex items-center gap-0.5 bg-secondary/50 p-0.5 rounded-md border border-border">
           <Tooltip>
@@ -31,12 +61,14 @@ export const CanvasBar: React.FC = () => {
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="h-6.5 w-6.5 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
+                onClick={undo}
+                disabled={!canUndo}
+                className="h-6.5 w-6.5 rounded-md text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
               >
                 <Undo2 className="size-3" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Undo (⌘Z)</TooltipContent>
+            <TooltipContent>Undo (Ctrl+Z / ⌘Z)</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -44,15 +76,16 @@ export const CanvasBar: React.FC = () => {
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="h-6.5 w-6.5 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
+                onClick={redo}
+                disabled={!canRedo}
+                className="h-6.5 w-6.5 rounded-md text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
               >
                 <Redo2 className="size-3" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Redo (⇧⌘Z)</TooltipContent>
+            <TooltipContent>Redo (Ctrl+Shift+Z / ⇧⌘Z)</TooltipContent>
           </Tooltip>
         </div>
-
 
         {/* Zoom Controls */}
         <div className="flex items-center gap-0.5 bg-secondary/50 p-0.5 rounded-md border border-border">
@@ -61,7 +94,7 @@ export const CanvasBar: React.FC = () => {
               <Button
                 variant="ghost"
                 size="icon-xs"
-                onClick={() => { }}
+                onClick={handleZoomOut}
                 className="h-6.5 w-6.5 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 <ZoomOut className="size-3" />
@@ -70,8 +103,8 @@ export const CanvasBar: React.FC = () => {
             <TooltipContent>Zoom Out</TooltipContent>
           </Tooltip>
 
-          <span className="font-mono text-[11px] min-w-9 text-center font-medium text-foreground px-1 select-none">
-            100%
+          <span className="font-mono text-[11px] min-w-10 text-center font-medium text-foreground px-1 select-none">
+            {zoomPercent}%
           </span>
 
           <Tooltip>
@@ -79,7 +112,7 @@ export const CanvasBar: React.FC = () => {
               <Button
                 variant="ghost"
                 size="icon-xs"
-                onClick={() => { }}
+                onClick={handleZoomIn}
                 className="h-6.5 w-6.5 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 <ZoomIn className="size-3" />
@@ -93,7 +126,7 @@ export const CanvasBar: React.FC = () => {
               <Button
                 variant="ghost"
                 size="icon-xs"
-                onClick={() => { }}
+                onClick={resetZoom}
                 className="h-6.5 w-6.5 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 <RotateCcw className="size-3" />
@@ -102,9 +135,7 @@ export const CanvasBar: React.FC = () => {
             <TooltipContent>Reset Zoom (100%)</TooltipContent>
           </Tooltip>
         </div>
-
       </div>
     </div>
   );
 };
-

@@ -8,7 +8,7 @@
 
 import type { StateCreator } from "zustand";
 
-import type { ID, Viewport } from "@/types/project";
+import type { Breakpoint, ID, Viewport } from "@/types/project";
 import type { ProjectStoreState } from "./storeTypes";
 import { makeId } from "./utils";
 
@@ -32,6 +32,21 @@ export interface ViewportSlice {
     setDefaultViewport: (
         viewportId: ID
     ) => void;
+
+    createBreakpoint: (params: {
+        name?: string;
+        minWidth: number;
+        isDefault?: boolean;
+    }) => ID;
+
+    updateBreakpoint: (
+        breakpointId: ID,
+        patch: Partial<Omit<Breakpoint, "id">>
+    ) => void;
+
+    removeBreakpoint: (
+        breakpointId: ID
+    ) => boolean;
 }
 
 /**
@@ -212,5 +227,86 @@ export const createViewportSlice: StateCreator<
                 ensureSingleDefaultViewport(draft.viewports);
             }
         });
+    },
+
+    // ==========================================================
+    // Create breakpoint
+    // ==========================================================
+
+    createBreakpoint: ({
+        name,
+        minWidth,
+        isDefault = false,
+    }) => {
+        const id = makeId("bp");
+        const trimmedName = name?.trim() || "Custom";
+        const normalizedMinWidth = Math.max(0, Math.round(minWidth));
+
+        get().mutate((draft) => {
+            draft.breakpoints.push({
+                id,
+                name: trimmedName,
+                minWidth: normalizedMinWidth,
+                isDefault,
+            });
+
+            // Keep breakpoints sorted by minWidth ascending
+            draft.breakpoints.sort((a, b) => a.minWidth - b.minWidth);
+        });
+
+        return id;
+    },
+
+    // ==========================================================
+    // Update breakpoint
+    // ==========================================================
+
+    updateBreakpoint: (
+        breakpointId,
+        patch
+    ) => {
+        get().mutate((draft) => {
+            const bp = draft.breakpoints.find((b) => b.id === breakpointId);
+            if (!bp) return;
+
+            if (patch.name !== undefined) {
+                bp.name = patch.name.trim() || "Custom";
+            }
+
+            if (patch.minWidth !== undefined) {
+                bp.minWidth = Math.max(0, Math.round(patch.minWidth));
+                draft.breakpoints.sort((a, b) => a.minWidth - b.minWidth);
+            }
+
+            if (patch.isDefault !== undefined) {
+                bp.isDefault = patch.isDefault;
+            }
+        });
+    },
+
+    // ==========================================================
+    // Remove breakpoint
+    // ==========================================================
+
+    removeBreakpoint: (
+        breakpointId
+    ) => {
+        const state = get();
+        if (state.project.breakpoints.length <= 1) {
+            return false;
+        }
+
+        let removed = false;
+        get().mutate((draft) => {
+            if (draft.breakpoints.length <= 1) return;
+
+            const index = draft.breakpoints.findIndex((b) => b.id === breakpointId);
+            if (index !== -1) {
+                draft.breakpoints.splice(index, 1);
+                removed = true;
+            }
+        });
+
+        return removed;
     },
 });

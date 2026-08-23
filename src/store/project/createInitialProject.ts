@@ -22,9 +22,6 @@ export function createInitialProject(options: CreateProjectOptions = {}): Projec
     const rootId: ID = "root";
     const pageId: ID = "page-home";
 
-    const breakpointId: ID = "bp-base";
-    const viewportId: ID = "vp-desktop";
-
     const rootNode: ElementNode = {
         id: rootId,
         type: "element",
@@ -93,20 +90,42 @@ export function createInitialProject(options: CreateProjectOptions = {}): Projec
 
         breakpoints: [
             {
-                id: breakpointId,
-                name: "Base",
-                minWidth: 0,
+                id: "bp-desktop",
+                name: "Desktop",
+                minWidth: 1200,
                 isDefault: true,
+            },
+            {
+                id: "bp-tablet",
+                name: "Tablet",
+                minWidth: 768,
+            },
+            {
+                id: "bp-mobile",
+                name: "Mobile",
+                minWidth: 480,
             },
         ],
 
         viewports: [
             {
-                id: viewportId,
+                id: "vp-desktop",
                 name: "Desktop",
                 width: 1440,
                 height: 900,
                 isDefault: true,
+            },
+            {
+                id: "vp-tablet",
+                name: "Tablet",
+                width: 768,
+                height: 1024,
+            },
+            {
+                id: "vp-mobile",
+                name: "Mobile",
+                width: 390,
+                height: 844,
             },
         ],
     };

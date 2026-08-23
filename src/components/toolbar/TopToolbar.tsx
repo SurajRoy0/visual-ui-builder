@@ -12,7 +12,6 @@ import {
   Moon,
   Sun,
   FileJson,
-  ChevronDown,
   FolderOpen,
   Check,
   Loader2,

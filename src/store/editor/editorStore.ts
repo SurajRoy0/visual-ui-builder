@@ -14,6 +14,7 @@ export interface EditorStoreActions {
     setActivePageId: (pageId: ID) => void;
     setActiveBreakpointId: (breakpointId: ID) => void;
     setActiveViewportId: (viewportId: ID) => void;
+    setViewportWidth: (width: number | null) => void;
     setZoom: (zoom: number | ((prev: number) => number)) => void;
     resetZoom: () => void;
     setGrid: (grid: Partial<EditorState["grid"]>) => void;
@@ -23,15 +24,18 @@ export interface EditorStoreActions {
     resetEditorState: () => void;
 }
 
-export type EditorStore = EditorState & EditorStoreActions;
+export type EditorStore = EditorState & {
+    viewportWidth: number | null;
+} & EditorStoreActions;
 
-export const initialEditorState: EditorState = {
+export const initialEditorState: EditorState & { viewportWidth: number | null } = {
     selectedNodeId: null,
     inspectedComponentInstanceId: null,
     inspectedComponentNodeId: null,
     activePageId: "page-home",
-    activeBreakpointId: "bp-base",
+    activeBreakpointId: "bp-desktop",
     activeViewportId: "vp-desktop",
+    viewportWidth: null,
     zoom: 1,
     grid: {
         visible: false,
@@ -70,7 +74,10 @@ export const useEditorStore = create<EditorStore>()((set) => ({
         set({ activeBreakpointId: breakpointId }),
 
     setActiveViewportId: (viewportId) =>
-        set({ activeViewportId: viewportId }),
+        set({ activeViewportId: viewportId, viewportWidth: null }),
+
+    setViewportWidth: (width) =>
+        set({ viewportWidth: width }),
 
     setZoom: (zoomOrUpdater) =>
         set((state) => {

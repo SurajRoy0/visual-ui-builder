@@ -20,9 +20,12 @@ import type { StateCreator } from "zustand";
 
 import {
     applyPatches,
+    enablePatches,
     produceWithPatches,
     type Patch,
 } from "immer";
+
+enablePatches();
 
 import type { Project } from "@/types/project";
 import type { ProjectStoreState } from "./storeTypes";
