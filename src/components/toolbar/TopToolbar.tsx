@@ -158,6 +158,22 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
 
       {/* Right: Mode Toggle, Theme Toggle, Export Button */}
       <div className="flex items-center gap-2">
+
+        {/* Theme Toggle */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={toggleTheme}
+              className="h-7.5 w-7.5 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              {isDark ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{isDark ? "Light Mode" : "Dark Mode"}</TooltipContent>
+        </Tooltip>
+
         {/* Mode Toggle (Edit / Preview) */}
         <Tabs
           value={mode}
@@ -176,21 +192,6 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
             </TabsTrigger>
           </TabsList>
         </Tabs>
-
-        {/* Theme Toggle */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              onClick={toggleTheme}
-              className="h-7.5 w-7.5 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
-            >
-              {isDark ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{isDark ? "Light Mode" : "Dark Mode"}</TooltipContent>
-        </Tooltip>
 
         {/* Export JSON Button */}
         <Button
