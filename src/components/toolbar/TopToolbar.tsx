@@ -77,24 +77,24 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
   return (
     <header className="h-12 border-b border-border flex items-center justify-between px-3 z-30 select-none bg-background text-foreground">
       {/* Left: Brand, Project Name & Switcher, Save Status */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-4">
+        <div className="relative">
+          <div className="absolute -inset-1 bg-linear-to-r from-blue-500/25 via-purple-500/25 to-pink-500/25 rounded-lg blur-xs group-hover:opacity-100 opacity-60 transition-opacity" />
+          <div className="relative w-7 h-7 rounded-md bg-linear-to-b from-secondary to-secondary/60 border border-border/90 flex items-center justify-center shadow-xs">
+            <span className="font-black text-xs bg-linear-to-br from-blue-500 via-indigo-500 to-pink-500 bg-clip-text text-transparent select-none tracking-tighter">
+              P
+            </span>
+          </div>
+        </div>
         {/* Brand Logo & Projects List Trigger */}
         <Tooltip>
           <TooltipTrigger asChild>
             <button
               onClick={onOpenProjectsModal}
-              className="flex items-center gap-2 pr-2.5 border-r border-border cursor-pointer group focus:outline-none"
+              className="cursor-pointer group focus:outline-none"
               title="All Projects"
             >
-              <div className="relative">
-                <div className="absolute -inset-1 bg-linear-to-r from-blue-500/25 via-purple-500/25 to-pink-500/25 rounded-lg blur-xs group-hover:opacity-100 opacity-60 transition-opacity" />
-                <div className="relative w-7 h-7 rounded-md bg-linear-to-b from-secondary to-secondary/60 border border-border/90 flex items-center justify-center shadow-xs">
-                  <span className="font-black text-xs bg-linear-to-br from-blue-500 via-indigo-500 to-pink-500 bg-clip-text text-transparent select-none tracking-tighter">
-                    P
-                  </span>
-                </div>
-              </div>
-              <FolderOpen className="size-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <FolderOpen className="size-5 ml-3 text-muted-foreground group-hover:text-foreground transition-colors" />
             </button>
           </TooltipTrigger>
           <TooltipContent>Manage & Switch Projects</TooltipContent>
@@ -122,17 +122,6 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
               <Edit3 className="size-3 opacity-0 group-hover:opacity-60 transition-opacity shrink-0" />
             </div>
           )}
-
-          {/* Project Switcher Dropdown Trigger */}
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onClick={onOpenProjectsModal}
-            className="size-7 text-muted-foreground hover:text-foreground cursor-pointer rounded-md"
-            title="Projects list"
-          >
-            <ChevronDown className="size-3.5" />
-          </Button>
         </div>
 
         {/* Autosave Status Indicator */}
