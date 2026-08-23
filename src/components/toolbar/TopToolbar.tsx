@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useProjectStore } from "@/store/project";
 import type { SaveStatus } from "@/hooks/useAutosave";
+import Link from "next/link";
 
 interface TopToolbarProps {
   onOpenJsonModal?: () => void;
@@ -78,14 +79,14 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
     <header className="h-12 border-b border-border flex items-center justify-between px-3 z-30 select-none bg-background text-foreground">
       {/* Left: Brand, Project Name & Switcher, Save Status */}
       <div className="flex items-center gap-4">
-        <div className="relative">
+        <Link href="/editor" className="relative">
           <div className="absolute -inset-1 bg-linear-to-r from-blue-500/25 via-purple-500/25 to-pink-500/25 rounded-lg blur-xs group-hover:opacity-100 opacity-60 transition-opacity" />
           <div className="relative w-7 h-7 rounded-md bg-linear-to-b from-secondary to-secondary/60 border border-border/90 flex items-center justify-center shadow-xs">
             <span className="font-black text-xs bg-linear-to-br from-blue-500 via-indigo-500 to-pink-500 bg-clip-text text-transparent select-none tracking-tighter">
               P
             </span>
           </div>
-        </div>
+        </Link>
         {/* Brand Logo & Projects List Trigger */}
         <Tooltip>
           <TooltipTrigger asChild>

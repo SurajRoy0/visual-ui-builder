@@ -7,6 +7,7 @@ import type {
     ID,
     Project,
 } from "@/types/project";
+import { makeId } from "./utils";
 
 export const SCHEMA_VERSION = "1.0.0";
 
@@ -45,7 +46,7 @@ export function createInitialProject(options: CreateProjectOptions = {}): Projec
     };
 
     return {
-        id: options.id || "project-1",
+        id: options.id || makeId("proj"),
 
         name: options.name || "Untitled Project",
 

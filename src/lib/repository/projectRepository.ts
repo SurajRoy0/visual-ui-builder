@@ -6,7 +6,7 @@
 // ensuring an easy swap for a cloud/backend API in the future.
 // ============================================================
 
-import { nanoid } from "nanoid";
+import { makeId } from "@/store/project/utils";
 import type { ID, Project, ProjectRepository, ProjectSummary } from "@/types/project";
 import { createInitialProject } from "@/store/project/createInitialProject";
 
@@ -76,7 +76,7 @@ export class IndexedDBProjectRepository implements ProjectRepository {
     }
 
     async createProject(details: { name: string; description?: string }): Promise<Project> {
-        const id: ID = `proj_${nanoid(10)}`;
+        const id: ID = makeId("proj");
         const project = createInitialProject({
             id,
             name: details.name.trim() || "Untitled Project",
