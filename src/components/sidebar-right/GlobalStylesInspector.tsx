@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { ProjectStyles } from "@/types/project";
 
 const DEFAULT_PROJECT_STYLES: ProjectStyles = {
@@ -166,7 +167,7 @@ export const GlobalStylesInspector: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search global styles & tokens..."
-            className="h-8 text-xs pl-8 bg-secondary/50 border-border/70 placeholder:text-muted-foreground"
+            className="h-8 text-xs font-normal pl-8 bg-secondary/50 border-border/70 placeholder:text-muted-foreground"
           />
         </div>
       </div>
@@ -175,17 +176,17 @@ export const GlobalStylesInspector: React.FC = () => {
       {(filteredColors.length > 0 || !q) && (
         <section className="p-3.5 space-y-2.5 border-b border-border/50">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-              <Palette className="size-3.5 text-blue" />
+            <div className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground tracking-tight">
+              <Palette className="size-4 text-blue" />
               <span>Color Palette Tokens</span>
             </div>
             <Button
               variant="ghost"
               size="xs"
               onClick={() => setIsAddingColor(!isAddingColor)}
-              className="h-6 text-[10px] gap-1 px-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
+              className="h-6 text-xs font-medium gap-1 px-2 text-muted-foreground hover:text-foreground cursor-pointer"
             >
-              <Plus className="size-3" />
+              <Plus className="size-3.5" />
               Add
             </Button>
           </div>
@@ -212,7 +213,7 @@ export const GlobalStylesInspector: React.FC = () => {
                   variant="ghost"
                   size="xs"
                   onClick={() => setIsAddingColor(false)}
-                  className="h-7 text-[10px]"
+                  className="h-7 text-xs"
                 >
                   Cancel
                 </Button>
@@ -220,9 +221,9 @@ export const GlobalStylesInspector: React.FC = () => {
                   variant="default"
                   size="xs"
                   onClick={handleAddColor}
-                  className="h-7 text-[10px] gap-1"
+                  className="h-7 text-xs font-medium gap-1"
                 >
-                  <Check className="size-3" /> Save Token
+                  <Check className="size-3.5" /> Save Token
                 </Button>
               </div>
             </div>
@@ -233,7 +234,7 @@ export const GlobalStylesInspector: React.FC = () => {
             {filteredColors.map(([key, val]) => (
               <div
                 key={key}
-                className="group flex items-center justify-between p-1.5 rounded-md border border-border bg-card/60 hover:bg-card text-xs transition-colors"
+                className="group flex items-center justify-between p-2 rounded-md border border-border bg-card/60 hover:bg-card text-xs transition-colors"
               >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <div className="relative shrink-0">
@@ -244,13 +245,13 @@ export const GlobalStylesInspector: React.FC = () => {
                       className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                     />
                     <div
-                      className="w-5 h-5 rounded border border-border shadow-2xs"
+                      className="w-6 h-6 rounded border border-border shadow-2xs"
                       style={{ backgroundColor: val }}
                     />
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[11px] font-medium text-foreground truncate">{key}</span>
-                    <span className="text-[9px] font-mono text-muted-foreground uppercase truncate">
+                    <span className="text-xs font-medium text-foreground truncate">{key}</span>
+                    <span className="text-[11px] font-mono font-normal text-muted-foreground uppercase truncate">
                       {val}
                     </span>
                   </div>
@@ -262,7 +263,7 @@ export const GlobalStylesInspector: React.FC = () => {
                   onClick={() => handleDeleteColor(key)}
                   className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive cursor-pointer"
                 >
-                  <Trash2 className="size-3" />
+                  <Trash2 className="size-3.5" />
                 </Button>
               </div>
             ))}
@@ -273,8 +274,8 @@ export const GlobalStylesInspector: React.FC = () => {
       {/* 2. Typography & Fonts */}
       {(filteredTypography.length > 0 || !q) && (
         <section className="p-3.5 space-y-2.5 border-b border-border/50">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-            <Type className="size-3.5 text-purple-500" />
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground tracking-tight">
+            <Type className="size-4 text-purple-500" />
             <span>Typography Hierarchy</span>
           </div>
 
@@ -282,24 +283,24 @@ export const GlobalStylesInspector: React.FC = () => {
             {filteredTypography.map(([tokenName, token]) => (
               <div
                 key={tokenName}
-                className="p-2 rounded-md border border-border bg-card/60 flex items-center justify-between text-xs"
+                className="p-2.5 rounded-md border border-border bg-card/60 flex items-center justify-between text-xs"
               >
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[11px] font-semibold text-foreground uppercase w-12">
+                <div className="flex items-center gap-2.5">
+                  <span className="font-mono text-xs font-semibold text-foreground uppercase w-14">
                     {tokenName}
                   </span>
-                  <span className="text-[10px] text-muted-foreground font-mono">
+                  <span className="text-[11px] text-muted-foreground font-mono">
                     {token.fontSize} / {token.fontWeight} / {token.lineHeight}
                   </span>
                 </div>
                 <span
                   style={{
-                    fontSize: token.fontSize ? `min(${token.fontSize}, 16px)` : "12px",
+                    fontSize: token.fontSize ? `min(${token.fontSize}, 16px)` : "14px",
                     fontWeight: token.fontWeight || "normal",
                   }}
-                  className="text-foreground truncate max-w-24 text-right"
+                  className="text-foreground font-medium truncate max-w-28 text-right"
                 >
-                  Aa
+                  Aa Sample
                 </span>
               </div>
             ))}
@@ -310,8 +311,8 @@ export const GlobalStylesInspector: React.FC = () => {
       {/* 3. Spacing Scale */}
       {(filteredSpacing.length > 0 || !q) && (
         <section className="p-3.5 space-y-2.5 border-b border-border/50">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-            <Maximize className="size-3.5 text-emerald-500" />
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground tracking-tight">
+            <Maximize className="size-4 text-emerald-500" />
             <span>Spacing Scale</span>
           </div>
 
@@ -319,10 +320,10 @@ export const GlobalStylesInspector: React.FC = () => {
             {filteredSpacing.map(([key, val]) => (
               <div
                 key={key}
-                className="p-1.5 rounded-md border border-border bg-card/60 flex flex-col items-center justify-center text-center"
+                className="p-2 rounded-md border border-border bg-card/60 flex flex-col items-center justify-center text-center"
               >
-                <span className="text-[10px] font-mono font-medium text-foreground">{key}</span>
-                <span className="text-[10px] font-mono text-muted-foreground">{String(val)}</span>
+                <span className="text-xs font-mono font-semibold text-foreground">{key}</span>
+                <span className="text-[11px] font-mono text-muted-foreground">{String(val)}</span>
               </div>
             ))}
           </div>
@@ -332,8 +333,8 @@ export const GlobalStylesInspector: React.FC = () => {
       {/* 4. Border Radius (Radii) */}
       {(filteredRadii.length > 0 || !q) && (
         <section className="p-3.5 space-y-2.5 border-b border-border/50">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-            <SlidersHorizontal className="size-3.5 text-amber-500" />
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground tracking-tight">
+            <SlidersHorizontal className="size-4 text-amber-500" />
             <span>Border Radii</span>
           </div>
 
@@ -341,14 +342,14 @@ export const GlobalStylesInspector: React.FC = () => {
             {filteredRadii.map(([key, val]) => (
               <div
                 key={key}
-                className="p-1.5 rounded-md border border-border bg-card/60 flex flex-col items-center justify-center text-center"
+                className="p-2 rounded-md border border-border bg-card/60 flex flex-col items-center justify-center text-center"
               >
                 <div
                   className="w-5 h-5 border border-foreground/40 bg-secondary/50 mb-1"
                   style={{ borderRadius: String(val) }}
                 />
-                <span className="text-[10px] font-mono font-medium text-foreground">{key}</span>
-                <span className="text-[9px] font-mono text-muted-foreground">{String(val)}</span>
+                <span className="text-xs font-mono font-semibold text-foreground">{key}</span>
+                <span className="text-[11px] font-mono text-muted-foreground">{String(val)}</span>
               </div>
             ))}
           </div>
@@ -359,17 +360,17 @@ export const GlobalStylesInspector: React.FC = () => {
       {(filteredVars.length > 0 || !q) && (
         <section className="p-3.5 space-y-2.5 border-b border-border/50">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-              <Code2 className="size-3.5 text-blue" />
+            <div className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground tracking-tight">
+              <Code2 className="size-4 text-blue" />
               <span>Project CSS Variables</span>
             </div>
             <Button
               variant="ghost"
               size="xs"
               onClick={() => setIsAddingVar(!isAddingVar)}
-              className="h-6 text-[10px] gap-1 px-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
+              className="h-6 text-xs font-medium gap-1 px-2 text-muted-foreground hover:text-foreground cursor-pointer"
             >
-              <Plus className="size-3" />
+              <Plus className="size-3.5" />
               Add
             </Button>
           </div>
@@ -394,7 +395,7 @@ export const GlobalStylesInspector: React.FC = () => {
                   variant="ghost"
                   size="xs"
                   onClick={() => setIsAddingVar(false)}
-                  className="h-7 text-[10px]"
+                  className="h-7 text-xs"
                 >
                   Cancel
                 </Button>
@@ -402,9 +403,9 @@ export const GlobalStylesInspector: React.FC = () => {
                   variant="default"
                   size="xs"
                   onClick={handleAddVar}
-                  className="h-7 text-[10px] gap-1"
+                  className="h-7 text-xs font-medium gap-1"
                 >
-                  <Check className="size-3" /> Save Variable
+                  <Check className="size-3.5" /> Save Variable
                 </Button>
               </div>
             </div>
@@ -414,13 +415,13 @@ export const GlobalStylesInspector: React.FC = () => {
             {filteredVars.map(([key, val]) => (
               <div
                 key={key}
-                className="group p-2 rounded-md border border-border bg-card/60 flex items-center justify-between gap-2 text-xs"
+                className="group p-2.5 rounded-md border border-border bg-card/60 flex items-center justify-between gap-2 text-xs"
               >
                 <div className="flex flex-col min-w-0 flex-1">
-                  <span className="font-mono text-[10px] font-semibold text-foreground truncate">
+                  <span className="font-mono text-xs font-semibold text-foreground truncate">
                     {key}
                   </span>
-                  <span className="font-mono text-[9px] text-muted-foreground truncate">
+                  <span className="font-mono text-[11px] text-muted-foreground truncate">
                     {String(val)}
                   </span>
                 </div>
@@ -430,7 +431,7 @@ export const GlobalStylesInspector: React.FC = () => {
                   onClick={() => handleDeleteVar(key)}
                   className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive cursor-pointer shrink-0"
                 >
-                  <Trash2 className="size-3" />
+                  <Trash2 className="size-3.5" />
                 </Button>
               </div>
             ))}

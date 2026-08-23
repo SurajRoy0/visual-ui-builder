@@ -233,11 +233,11 @@ export const LayersTab: React.FC = () => {
               {getNodeIcon(node.type)}
             </div>
 
-            <span className="truncate text-xs">{node.name}</span>
+            <span className="truncate text-xs font-medium text-foreground">{node.name}</span>
 
             <span
-              className={`text-[9px] font-mono uppercase px-1 py-0.2 rounded-md shrink-0 opacity-60 ${isSelected
-                  ? "bg-white/12 dark:bg-white/12 bg-black/8 text-foreground font-semibold"
+              className={`text-[10px] font-mono font-medium uppercase px-1.5 py-0.5 rounded-md shrink-0 opacity-70 ${isSelected
+                  ? "bg-white/16 dark:bg-white/16 bg-black/10 text-foreground font-semibold"
                   : "bg-secondary text-muted-foreground"
                 }`}
             >
@@ -394,9 +394,9 @@ export const LayersTab: React.FC = () => {
                 >
                   {page.icon}
                 </span>
-                <span>{page.name}</span>
+                <span className="font-medium">{page.name}</span>
               </div>
-              <span className="text-[10px] font-mono opacity-60">{page.path}</span>
+              <span className="text-[11px] font-mono opacity-70">{page.path}</span>
             </div>
           ))}
         </div>
@@ -405,10 +405,10 @@ export const LayersTab: React.FC = () => {
       {/* Layer Tree */}
       <div className="p-3 flex-1 flex flex-col min-h-0">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-semibold text-foreground px-1 tracking-tight">
+          <span className="text-[13px] font-semibold text-foreground px-1 tracking-tight">
             Layer Tree
           </span>
-          <span className="text-[10px] font-mono text-muted-foreground">
+          <span className="text-[11px] font-mono text-muted-foreground font-medium">
             {countNodes(filteredLayers)} Elements
           </span>
         </div>

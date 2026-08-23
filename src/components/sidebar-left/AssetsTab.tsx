@@ -107,12 +107,12 @@ export const AssetsTab: React.FC = () => {
 
       <div className="p-3 flex flex-col gap-3">
         {/* Filter Tabs / Quick Chips */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
           {(["all", "image", "svg", "font"] as const).map((filter) => (
             <button
               key={filter}
               onClick={() => setActiveFilter(filter)}
-              className={`px-2.5 py-1 rounded-md text-[10px] font-medium capitalize transition-colors cursor-pointer shrink-0 ${
+              className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-colors cursor-pointer shrink-0 ${
                 activeFilter === filter
                   ? "bg-foreground text-background font-semibold"
                   : "bg-secondary text-muted-foreground hover:text-foreground"
@@ -125,15 +125,15 @@ export const AssetsTab: React.FC = () => {
 
         {/* Upload Header */}
         <div className="flex items-center justify-between pt-0.5">
-          <span className="text-xs font-semibold text-foreground px-1 tracking-tight">
+          <span className="text-[13px] font-semibold text-foreground px-1 tracking-tight">
             Project Assets ({filteredAssets.length})
           </span>
           <Button
             variant="outline"
             size="xs"
-            className="h-7 text-[10px] gap-1 px-2 rounded-md cursor-pointer hover:bg-black/5 dark:hover:bg-white/8"
+            className="h-7 text-xs font-medium gap-1 px-2.5 rounded-md cursor-pointer hover:bg-black/5 dark:hover:bg-white/8"
           >
-            <Upload className="size-3" />
+            <Upload className="size-3.5" />
             Upload
           </Button>
         </div>
@@ -151,10 +151,10 @@ export const AssetsTab: React.FC = () => {
                     {getAssetIcon(asset.type)}
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-medium text-foreground truncate max-w-44">
+                    <span className="text-xs font-semibold text-foreground truncate max-w-44">
                       {asset.name}
                     </span>
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-mono">
                       <span>{asset.size}</span>
                       {asset.dimensions && <span>• {asset.dimensions}</span>}
                     </div>

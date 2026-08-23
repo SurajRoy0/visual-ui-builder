@@ -150,7 +150,7 @@ export const ElementsTab: React.FC = () => {
     if (items.length === 0) return null;
     return (
       <div className="space-y-1.5">
-        <h4 className="text-[10px] font-semibold tracking-wider uppercase text-muted-foreground px-1">
+        <h4 className="text-[11px] font-semibold tracking-wider uppercase text-muted-foreground px-1">
           {title} ({items.length})
         </h4>
         <div className="grid grid-cols-1 gap-1.5">
@@ -160,17 +160,17 @@ export const ElementsTab: React.FC = () => {
               className="group relative flex items-center justify-between p-2 rounded-md border border-border bg-card hover:bg-black/4 dark:hover:bg-white/6 hover:border-foreground/30 transition-all cursor-pointer shadow-2xs select-none"
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-7 h-7 rounded-md bg-secondary text-foreground border border-border flex items-center justify-center shrink-0 group-hover:border-foreground/40">
+                <div className="w-8 h-8 rounded-md bg-secondary text-foreground border border-border flex items-center justify-center shrink-0 group-hover:border-foreground/40">
                   {item.icon}
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 truncate">
                     {item.name}
-                    <span className="text-[9px] font-mono font-normal text-muted-foreground bg-secondary/80 px-1 py-0.2 rounded-md shrink-0">
+                    <span className="text-[10px] font-mono font-medium text-muted-foreground bg-secondary/80 px-1 py-0.2 rounded-md shrink-0">
                       {item.tag}
                     </span>
                   </span>
-                  <span className="text-[10.5px] text-muted-foreground truncate">
+                  <span className="text-[11px] text-muted-foreground truncate">
                     {item.description}
                   </span>
                 </div>

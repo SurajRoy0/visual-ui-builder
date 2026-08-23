@@ -40,7 +40,7 @@ export const LeftSidebar: React.FC = () => {
               <TooltipTrigger asChild>
                 <TabsTrigger
                   value={tab.id}
-                  className="flex-1 flex-col py-1.5 px-1 h-auto text-[10px] font-medium gap-1 rounded-md cursor-pointer"
+                  className="flex-1 flex-col py-1.5 px-1 h-auto text-xs font-medium gap-1 rounded-md cursor-pointer"
                 >
                   {tab.icon}
                   <span className="truncate max-w-15">{tab.label}</span>

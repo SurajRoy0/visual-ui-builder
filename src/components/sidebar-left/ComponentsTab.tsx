@@ -87,15 +87,15 @@ export const ComponentsTab: React.FC = () => {
       <div className="p-3 flex flex-col gap-3">
         {/* Header & Create Button */}
         <div className="flex items-center justify-between pt-0.5">
-          <span className="text-xs font-semibold text-foreground px-1 tracking-tight">
+          <span className="text-[13px] font-semibold text-foreground px-1 tracking-tight">
             Components ({filteredComponents.length})
           </span>
           <Button
             variant="outline"
             size="xs"
-            className="h-7 text-[10px] gap-1 px-2 rounded-md cursor-pointer hover:bg-black/5 dark:hover:bg-white/8"
+            className="h-7 text-xs font-medium gap-1 px-2.5 rounded-md cursor-pointer hover:bg-black/5 dark:hover:bg-white/8"
           >
-            <Plus className="size-3" />
+            <Plus className="size-3.5" />
             Create
           </Button>
         </div>
@@ -116,7 +116,7 @@ export const ComponentsTab: React.FC = () => {
                     <span className="text-xs font-semibold text-foreground truncate max-w-44">
                       {comp.name}
                     </span>
-                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
+                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-mono">
                       <span>{comp.category}</span>
                       <span>• {comp.elementCount} elements</span>
                     </div>
@@ -136,7 +136,7 @@ export const ComponentsTab: React.FC = () => {
         )}
 
         {/* Info notice */}
-        <div className="mt-1 p-2.5 rounded-md border border-border bg-secondary/30 text-[11px] text-muted-foreground flex flex-col gap-1">
+        <div className="mt-1 p-2.5 rounded-md border border-border bg-secondary/30 text-xs text-muted-foreground flex flex-col gap-1">
           <span className="font-semibold text-foreground flex items-center gap-1">
             💡 Reusable Symbols:
           </span>
