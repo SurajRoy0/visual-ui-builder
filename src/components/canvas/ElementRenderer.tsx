@@ -97,6 +97,8 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
     const imgAttributes = elementNode.attributes as Record<string, unknown>;
     return (
       <img
+        data-node-id={nodeId}
+        data-tag={tag}
         src={
           (imgAttributes?.src as string) ||
           "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=600&auto=format&fit=crop&q=80"
@@ -117,6 +119,8 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
 
     return (
       <button
+        data-node-id={nodeId}
+        data-tag={tag}
         type="button"
         style={effectiveStyles}
         onClick={handleClick}
@@ -158,6 +162,8 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
 
     return (
       <TextTag
+        data-node-id={nodeId}
+        data-tag={tag}
         style={effectiveStyles}
         onClick={handleClick}
         className={outlineClass}
@@ -180,6 +186,8 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
   if (isRoot && elementNode.children.length === 0) {
     return (
       <div
+        data-node-id={nodeId}
+        data-tag={tag}
         style={effectiveStyles}
         onClick={handleClick}
         className="w-full min-h-full flex flex-col items-center justify-center p-8 text-foreground select-none"
@@ -247,6 +255,8 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
   if (elementNode.children.length === 0 && !isRoot) {
     return (
       <ContainerTag
+        data-node-id={nodeId}
+        data-tag={tag}
         style={{
           minHeight: "48px",
           minWidth: "48px",
@@ -266,6 +276,8 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
   // Normal container with children
   return (
     <ContainerTag
+      data-node-id={nodeId}
+      data-tag={tag}
       style={effectiveStyles}
       onClick={handleClick}
       className={outlineClass}

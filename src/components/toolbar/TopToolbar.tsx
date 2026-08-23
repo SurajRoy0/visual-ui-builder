@@ -125,7 +125,7 @@ export const TopToolbar: React.FC<TopToolbarProps> = ({
         </div>
 
         {/* Autosave Status Indicator */}
-        <div className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-secondary/30 border border-border/40 ml-1">
+        <div className=" w-18 h-7 hidden sm:flex justify-center items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-secondary/30 border border-border/40 ml-1">
           {saveStatus === "saving" && (
             <>
               <Loader2 className="size-3 animate-spin text-amber-500" />

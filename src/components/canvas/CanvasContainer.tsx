@@ -7,6 +7,7 @@
 // - Supports smooth interactive drag-to-resize on left/right handles.
 // - Real-time synchronization with CanvasBar and BreakpointBar.
 // - Handles background deselection.
+// - Supports Phase 4 drag-and-drop from toolbox with live drop indicator.
 // ============================================================
 
 "use client";
@@ -14,13 +15,22 @@
 import React, { useRef, useState, useCallback } from "react";
 import { CanvasRenderer } from "./CanvasRenderer";
 import { SelectionOverlay } from "./SelectionOverlay";
+import { DropIndicatorOverlay } from "./DropIndicatorOverlay";
 import { CanvasBar } from "./CanvasBar";
 import { useEditorStore } from "@/store/editor";
 import { useProjectStore } from "@/store/project";
+import {
+  computeDropResult,
+  getGlobalDraggedDefinition,
+  setGlobalDraggedDefinition,
+  type DropTargetResult,
+} from "@/lib/dropTargetResolution";
+import type { ElementDefinitionItem } from "@/lib/elementDefinitions";
 
 export const CanvasContainer: React.FC = () => {
   const zoom = useEditorStore((state) => state.zoom);
   const activeViewportId = useEditorStore((state) => state.activeViewportId);
+  const activePageId = useEditorStore((state) => state.activePageId);
   const viewportWidth = useEditorStore((state) => state.viewportWidth);
   const setSelectedNodeId = useEditorStore((state) => state.setSelectedNodeId);
   const setViewportWidth = useEditorStore((state) => state.setViewportWidth);
@@ -28,10 +38,21 @@ export const CanvasContainer: React.FC = () => {
 
   const viewports = useProjectStore((state) => state.project.viewports);
   const breakpoints = useProjectStore((state) => state.project.breakpoints);
+  const pages = useProjectStore((state) => state.project.pages);
+  const elements = useProjectStore((state) => state.project.elements);
   const updateViewport = useProjectStore((state) => state.updateViewport);
+  const addElementNode = useProjectStore((state) => state.addElementNode);
+  const updateNodeStyle = useProjectStore((state) => state.updateNodeStyle);
+  const updateTextContent = useProjectStore((state) => state.updateTextContent);
+  const updateNodeAttributes = useProjectStore((state) => state.updateNodeAttributes);
+  const batch = useProjectStore((state) => state.batch);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const [isDraggingHandle, setIsDraggingHandle] = useState<"left" | "right" | null>(null);
+
+  // Transient drag-and-drop indicator state
+  const [dropTarget, setDropTarget] = useState<DropTargetResult | null>(null);
+  const [activeDraggedItem, setActiveDraggedItem] = useState<ElementDefinitionItem | null>(null);
 
   const activeViewport =
     viewports.find((v) => v.id === activeViewportId) ||
@@ -59,7 +80,7 @@ export const CanvasContainer: React.FC = () => {
     [breakpoints, setActiveBreakpointId]
   );
 
-  // Resize handler start
+  // Viewport resize handle start
   const handlePointerDown = (side: "left" | "right", e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -105,6 +126,107 @@ export const CanvasContainer: React.FC = () => {
     window.addEventListener("pointercancel", handlePointerUp);
   };
 
+  // ============================================================
+  // Canvas Drag & Drop Handlers (Phase 4)
+  // ============================================================
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "copy";
+
+    const dragged = getGlobalDraggedDefinition();
+    if (!dragged || !viewportRef.current) return;
+
+    setActiveDraggedItem(dragged);
+
+    const activePage = pages[activePageId] || Object.values(pages)[0];
+    const rootId = activePage?.rootElementId || "root";
+
+    const result = computeDropResult({
+      clientX: e.clientX,
+      clientY: e.clientY,
+      viewportElement: viewportRef.current,
+      zoom,
+      elements,
+      activePageRootId: rootId,
+      draggedItem: dragged,
+    });
+
+    setDropTarget(result);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!viewportRef.current?.contains(e.relatedTarget as Node)) {
+      setDropTarget(null);
+      setActiveDraggedItem(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    let item = getGlobalDraggedDefinition();
+    if (!item) {
+      try {
+        const raw = e.dataTransfer.getData("application/x-playfull-element");
+        if (raw) item = JSON.parse(raw);
+      } catch {
+        // Ignore parse error
+      }
+    }
+
+    if (!item || !viewportRef.current) {
+      setDropTarget(null);
+      setActiveDraggedItem(null);
+      return;
+    }
+
+    const activePage = pages[activePageId] || Object.values(pages)[0];
+    const rootId = activePage?.rootElementId || "root";
+
+    const result = computeDropResult({
+      clientX: e.clientX,
+      clientY: e.clientY,
+      viewportElement: viewportRef.current,
+      zoom,
+      elements,
+      activePageRootId: rootId,
+      draggedItem: item,
+    });
+
+    if (result && result.allowed) {
+      batch(() => {
+        const newId = addElementNode({
+          tag: item.tag,
+          parentId: result.parentId,
+          index: result.index,
+          name: item.name,
+        });
+
+        if (newId) {
+          if (item.defaultStyle) {
+            updateNodeStyle(newId, item.defaultStyle);
+          }
+          if (item.defaultContent) {
+            updateTextContent(newId, item.defaultContent);
+          }
+          if (item.defaultAttributes) {
+            updateNodeAttributes(newId, item.defaultAttributes);
+          }
+          setSelectedNodeId(newId);
+        }
+      });
+    }
+
+    setDropTarget(null);
+    setActiveDraggedItem(null);
+    setGlobalDraggedDefinition(null);
+  };
+
   return (
     <div className="relative flex-1 flex flex-col h-full overflow-hidden select-none bg-secondary/25">
       {/* Standalone Canvas Top Bar */}
@@ -142,6 +264,9 @@ export const CanvasContainer: React.FC = () => {
             {/* Simulated Website Viewport Screen */}
             <div
               ref={viewportRef}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
               style={{
                 width: `${currentDisplayWidth}px`,
                 minHeight: `${activeViewport.height}px`,
@@ -153,6 +278,12 @@ export const CanvasContainer: React.FC = () => {
 
               {/* Selection & Resize Overlay */}
               <SelectionOverlay />
+
+              {/* Live Drag & Drop Indicator Overlay */}
+              <DropIndicatorOverlay
+                dropTarget={dropTarget}
+                draggedItem={activeDraggedItem}
+              />
             </div>
 
             {/* Right Canvas Resize Handle */}
@@ -177,3 +308,4 @@ export const CanvasContainer: React.FC = () => {
     </div>
   );
 };
+

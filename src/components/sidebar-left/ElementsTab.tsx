@@ -28,6 +28,7 @@ import {
   type ElementDefinitionItem,
   type ElementCategory,
 } from "@/lib/elementDefinitions";
+import { setGlobalDraggedDefinition } from "@/lib/dropTargetResolution";
 import { canDropElementIntoParent } from "@/lib/elementRules";
 import { useProjectStore } from "@/store/project";
 import { useEditorStore } from "@/store/editor";
@@ -295,13 +296,25 @@ export const ElementsTab: React.FC = () => {
                       return (
                         <div
                           key={item.id}
+                          draggable={true}
+                          onDragStart={(e) => {
+                            setGlobalDraggedDefinition(item);
+                            e.dataTransfer.setData(
+                              "application/x-playfull-element",
+                              JSON.stringify(item)
+                            );
+                            e.dataTransfer.effectAllowed = "copy";
+                          }}
+                          onDragEnd={() => {
+                            setGlobalDraggedDefinition(null);
+                          }}
                           onClick={() => handleAddElement(item)}
-                          className={`group relative flex flex-col p-2.5 rounded-lg border transition-all select-none ${
+                          className={`group relative flex flex-col p-2.5 rounded-lg border transition-all select-none cursor-grab active:cursor-grabbing ${
                             !isAllowed
-                              ? "cursor-not-allowed bg-secondary/15 border-border/50 hover:border-amber-500/40"
+                              ? "bg-secondary/15 border-border/50 hover:border-amber-500/40"
                               : isItemInError
-                                ? "cursor-pointer border-amber-500/60 bg-amber-500/10 shadow-xs"
-                                : "cursor-pointer border-border/80 bg-gradient-to-r from-card to-card/60 hover:from-card hover:to-secondary/40 hover:border-foreground/25 hover:shadow-xs active:scale-[0.99]"
+                                ? "border-amber-500/60 bg-amber-500/10 shadow-xs"
+                                : "border-border/80 bg-gradient-to-r from-card to-card/60 hover:from-card hover:to-secondary/40 hover:border-foreground/25 hover:shadow-xs active:scale-[0.99]"
                           }`}
                         >
                           {/* Main Card Header */}
