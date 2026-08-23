@@ -23,17 +23,7 @@ import { CreateProjectModal } from "@/components/modals/CreateProjectModal";
 import { DeleteProjectDialog } from "@/components/modals/DeleteProjectDialog";
 import { useTheme } from "@/hooks/use-theme";
 import { Sun, Moon } from "lucide-react";
-
-function formatDate(timestamp: number): string {
-  const date = new Date(timestamp);
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+import { formatDate } from "@/lib/utils";
 
 export default function ProjectsDashboardPage() {
   const router = useRouter();

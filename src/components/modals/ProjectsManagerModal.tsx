@@ -27,6 +27,7 @@ import type { ID, ProjectSummary, Project } from "@/types/project";
 import { getProjectRepository } from "@/lib/repository/projectRepository";
 import { CreateProjectModal } from "./CreateProjectModal";
 import { DeleteProjectDialog } from "./DeleteProjectDialog";
+import { formatDate } from "@/lib/utils";
 
 interface ProjectsManagerModalProps {
   isOpen: boolean;
@@ -35,16 +36,6 @@ interface ProjectsManagerModalProps {
   onSelectProject: (projectId: ID) => void;
 }
 
-function formatDate(timestamp: number): string {
-  const date = new Date(timestamp);
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 export const ProjectsManagerModal: React.FC<ProjectsManagerModalProps> = ({
   isOpen,
@@ -205,20 +196,18 @@ export const ProjectsManagerModal: React.FC<ProjectsManagerModalProps> = ({
                   return (
                     <div
                       key={project.id}
-                      className={`group relative rounded-xl border p-4 flex items-center justify-between gap-5 transition-all duration-150 ${
-                        isCurrent
-                          ? "border-primary/40 bg-primary/5 shadow-xs"
-                          : "border-border/70 hover:border-border hover:bg-secondary/40 bg-card"
-                      }`}
+                      className={`group relative rounded-xl border p-4 flex items-center justify-between gap-5 transition-all duration-150 ${isCurrent
+                        ? "border-primary/40 bg-primary/5 shadow-xs"
+                        : "border-border/70 hover:border-border hover:bg-secondary/40 bg-card"
+                        }`}
                     >
                       {/* Left: Project Icon & Details */}
                       <div className="flex items-center gap-4 min-w-0 flex-1">
                         <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-                            isCurrent
-                              ? "bg-primary/10 border-primary/30 text-primary"
-                              : "bg-secondary/80 border-border/80 text-muted-foreground group-hover:text-foreground"
-                          }`}
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${isCurrent
+                            ? "bg-primary/10 border-primary/30 text-primary"
+                            : "bg-secondary/80 border-border/80 text-muted-foreground group-hover:text-foreground"
+                            }`}
                         >
                           <FileCode2 className="size-5" />
                         </div>
