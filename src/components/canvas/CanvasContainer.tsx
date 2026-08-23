@@ -4,10 +4,9 @@ import React from "react";
 import { CanvasRenderer } from "./CanvasRenderer";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { CanvasBar } from "./CanvasBar";
-import { useEditorStore } from "@/hooks/use-editor-store";
 
 export const CanvasContainer: React.FC = () => {
-  const { canvasScale, canvasWidth } = useEditorStore();
+
 
   return (
     <div className="relative flex-1 flex flex-col h-full overflow-hidden select-none bg-secondary/30">
@@ -19,7 +18,7 @@ export const CanvasContainer: React.FC = () => {
         <div
           className="relative flex flex-col items-center transition-transform origin-top"
           style={{
-            transform: `scale(${canvasScale})`,
+            transform: `scale(1)`,
           }}
         >
           <div className="relative flex items-stretch">
@@ -34,7 +33,7 @@ export const CanvasContainer: React.FC = () => {
             {/* Actual Viewport Screen */}
             <div
               style={{
-                width: `${canvasWidth}px`,
+                width: `1080px`,
                 minHeight: "750px",
               }}
               className="relative shadow-2xl rounded-md overflow-hidden bg-background ring-1 ring-border"

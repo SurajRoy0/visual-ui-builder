@@ -5,7 +5,6 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Monitor, Tablet, Smartphone, Plus } from "lucide-react";
-import { Separator } from "../ui/separator";
 
 interface BreakpointItem {
   id: string;
@@ -58,9 +57,9 @@ export const BreakpointBar: React.FC = () => {
           <Button
             variant="secondary"
             size="icon-sm"
-            className="h-7.5 w-7.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/8 cursor-pointer"
+            className="h-8 w-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/8 cursor-pointer"
           >
-            <Plus className="size-3.5" />
+            <Plus className="size-4" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Add Breakpoint</TooltipContent>

@@ -1,76 +1,69 @@
 "use client";
 
 import React, { useState } from "react";
-import { PageSection } from "./PageSection";
-import { BoxInspector } from "./BoxInspector";
-import { TextInspector } from "./TextInspector";
-import { Badge } from "@/components/ui/badge";
+import { SelectedElementInspector } from "./SelectedElementInspector";
+import { GlobalStylesInspector } from "./GlobalStylesInspector";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useEditorStore } from "@/hooks/use-editor-store";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Sliders, Globe } from "lucide-react";
+import { useEditorStore } from "@/store/editor/editorStore";
+import { useProjectStore } from "@/store/project/projectStore";
 
-type InspectorTab = "box" | "text" | "page";
+type RightTab = "element" | "global";
 
 export const RightSidebar: React.FC = () => {
-  const selectedElement = useEditorStore((s) => s.selectedElement);
-  const defaultTab: InspectorTab =
-    selectedElement.type === "text"
-      ? "text"
-      : selectedElement.type === "page"
-        ? "page"
-        : "box";
+  const [activeTab, setActiveTab] = useState<RightTab>("element");
+  const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
+  const elements = useProjectStore((state) => state.project.elements);
+  const selectedNode = selectedNodeId ? elements[selectedNodeId] : null;
 
-  const [manualTab, setManualTab] = useState<{ id: string; tab: InspectorTab } | null>(null);
-  const activeTab = manualTab?.id === selectedElement.id ? manualTab.tab : defaultTab;
+  // Dynamic tab label: shows the currently selected element name (e.g. "Box", "Heading", "Button", etc.)
+  const selectedItemLabel = selectedNode?.name || "Box";
+
+  const tabs: { id: RightTab; label: string; icon: React.ReactNode }[] = [
+    { id: "element", label: selectedItemLabel, icon: <Sliders className="size-4" /> },
+    { id: "global", label: "Global", icon: <Globe className="size-4" /> },
+  ];
 
   return (
-    <aside className="w-[320px] h-full flex flex-col border-l border-border shrink-0 z-10 select-none bg-background text-foreground">
+    <aside className="w-80 h-full flex flex-col border-l border-border shrink-0 z-10 select-none bg-background text-foreground overflow-hidden">
       <Tabs
         value={activeTab}
-        onValueChange={(val) => {
-          if (val) setManualTab({ id: selectedElement.id, tab: val as InspectorTab });
-        }}
-        className="h-full flex flex-col gap-0"
+        onValueChange={(value) => setActiveTab(value as RightTab)}
+        className="h-full flex flex-col min-h-0 gap-0"
       >
-        {/* Header Info & Element Name Indicator */}
-        <div className="px-3.5 py-2 border-b border-border bg-secondary/40 flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
-            <span className="text-xs font-semibold text-foreground font-mono truncate">
-              {selectedElement.name || (activeTab === "box" ? "Card Container" : activeTab === "text" ? "Hero Heading" : "Page Root")}
-            </span>
-            <Badge variant="secondary" className="uppercase font-mono text-[9px] shrink-0 rounded-md">
-              {selectedElement.tag || (activeTab === "box" ? "div" : activeTab === "text" ? "h1" : "page")}
-            </Badge>
-          </div>
-        </div>
-
-        {/* Inspector Mode Switcher */}
-        <TabsList className="w-full h-auto p-1 rounded-none border-b border-border bg-secondary/40 justify-between gap-1">
-          {(["box", "text", "page"] as const).map((tab) => (
-            <TabsTrigger
-              key={tab}
-              value={tab}
-              className="flex-1 py-1 text-center text-xs font-medium capitalize rounded-md cursor-pointer"
-            >
-              {tab}
-            </TabsTrigger>
+        {/* 2 Tabs Header Rail matching LeftSidebar */}
+        <TabsList className="w-full h-auto p-1 rounded-none border-b border-border bg-secondary/40 justify-between gap-1 shrink-0">
+          {tabs.map((tab) => (
+            <Tooltip key={tab.id}>
+              <TooltipTrigger asChild>
+                <TabsTrigger
+                  value={tab.id}
+                  className="flex-1 flex-col py-1.5 px-1 h-auto text-[10px] font-medium gap-1 rounded-md cursor-pointer"
+                >
+                  {tab.icon}
+                  <span className="truncate max-w-28">{tab.label}</span>
+                </TabsTrigger>
+              </TooltipTrigger>
+              <TooltipContent>
+                {tab.id === "element"
+                  ? `${selectedItemLabel} Inspector`
+                  : "Global Project Styles & Tokens"}
+              </TooltipContent>
+            </Tooltip>
           ))}
         </TabsList>
 
-        {/* Inspector Panel Components */}
-        <ScrollArea className="flex-1 pb-10">
-          <TabsContent value="box" className="mt-0 outline-none">
-            <BoxInspector />
+        {/* Tab Contents Area with reliable native scrolling */}
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+          <TabsContent value="element" className="mt-0 outline-none pb-12">
+            <SelectedElementInspector />
           </TabsContent>
-          <TabsContent value="text" className="mt-0 outline-none">
-            <TextInspector />
+          <TabsContent value="global" className="mt-0 outline-none pb-12">
+            <GlobalStylesInspector />
           </TabsContent>
-          <TabsContent value="page" className="mt-0 outline-none">
-            <PageSection />
-          </TabsContent>
-        </ScrollArea>
+        </div>
       </Tabs>
     </aside>
   );
 };
-
