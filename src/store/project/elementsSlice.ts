@@ -38,6 +38,10 @@ export interface ElementsSlice {
         nodeId: ID
     ) => void;
 
+    duplicateNode: (
+        nodeId: ID
+    ) => ID | null;
+
     moveNode: (params: {
         nodeId: ID;
         newParentId: ID;
@@ -296,6 +300,79 @@ export const createElementsSlice: StateCreator<
                 );
             }
         });
+    },
+
+    // ==========================================================
+    // Duplicate node
+    // ==========================================================
+
+    duplicateNode: (nodeId) => {
+        const state = get();
+        const originalNode = state.project.elements[nodeId];
+        if (!originalNode || isPageRoot(state.project.pages, nodeId) || !originalNode.parentId) {
+            return null;
+        }
+
+        const parent = state.project.elements[originalNode.parentId];
+        if (!parent || parent.type !== "element") {
+            return null;
+        }
+
+        let newRootId: ID | null = null;
+
+        get().mutate((draft) => {
+            const draftParent = draft.elements[originalNode.parentId!];
+            if (!draftParent || draftParent.type !== "element") return;
+
+            const cloneSubtree = (currentId: ID, parentId: ID, isRoot: boolean): ID | null => {
+                const source = draft.elements[currentId];
+                if (!source) return null;
+
+                const newId = makeId(source.type === "element" ? "el" : "comp");
+                const newName = isRoot ? `${source.name} (Copy)` : source.name;
+
+                if (source.type === "element") {
+                    const clonedChildren: ID[] = [];
+                    const clonedNode: ElementNode = {
+                        ...JSON.parse(JSON.stringify(source)),
+                        id: newId,
+                        name: newName,
+                        parentId,
+                        children: [],
+                    };
+
+                    draft.elements[newId] = clonedNode;
+
+                    for (const childId of source.children) {
+                        const clonedChildId = cloneSubtree(childId, newId, false);
+                        if (clonedChildId) {
+                            clonedChildren.push(clonedChildId);
+                        }
+                    }
+
+                    (draft.elements[newId] as ElementNode).children = clonedChildren;
+                    return newId;
+                } else {
+                    const clonedInstance = {
+                        ...JSON.parse(JSON.stringify(source)),
+                        id: newId,
+                        name: newName,
+                        parentId,
+                    };
+                    draft.elements[newId] = clonedInstance;
+                    return newId;
+                }
+            };
+
+            newRootId = cloneSubtree(nodeId, originalNode.parentId!, true);
+            if (newRootId) {
+                const originalIndex = draftParent.children.indexOf(nodeId);
+                const insertIndex = originalIndex !== -1 ? originalIndex + 1 : draftParent.children.length;
+                draftParent.children.splice(insertIndex, 0, newRootId);
+            }
+        });
+
+        return newRootId;
     },
 
     // ==========================================================
