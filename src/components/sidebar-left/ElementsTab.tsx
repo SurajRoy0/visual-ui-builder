@@ -9,6 +9,17 @@ import {
   Check,
   AlertCircle,
   SlidersHorizontal,
+  X,
+  Ban,
+  ChevronDown,
+  ChevronRight,
+  Layout,
+  Type,
+  Image as ImageIcon,
+  FormInput,
+  List,
+  Table as TableIcon,
+  MousePointerClick,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,18 +31,24 @@ import {
 import { canDropElementIntoParent } from "@/lib/elementRules";
 import { useProjectStore } from "@/store/project";
 import { useEditorStore } from "@/store/editor";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+
+const CATEGORY_ICONS: Record<ElementCategory, React.ReactNode> = {
+  structure: <Layout className="size-3.5 text-sky-500" />,
+  typography: <Type className="size-3.5 text-emerald-500" />,
+  media: <ImageIcon className="size-3.5 text-pink-500" />,
+  forms: <FormInput className="size-3.5 text-amber-500" />,
+  lists: <List className="size-3.5 text-indigo-500" />,
+  tables: <TableIcon className="size-3.5 text-teal-500" />,
+  interactive: <MousePointerClick className="size-3.5 text-violet-500" />,
+};
 
 export const ElementsTab: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<ElementCategory | "all">("all");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<{ id: string; reason: string } | null>(null);
+  const [errorMessage, setErrorMessage] = useState<{ id: string; tagName: string; reason: string } | null>(null);
 
   const {
     project,
@@ -58,10 +75,16 @@ export const ElementsTab: React.FC = () => {
     const validation = canDropElementIntoParent(item, targetParentNode);
 
     if (!validation.allowed) {
-      setErrorMessage({ id: item.id, reason: validation.reason || "Invalid parent element" });
-      setTimeout(() => setErrorMessage(null), 3000);
+      setErrorMessage({
+        id: item.id,
+        tagName: item.tag,
+        reason: validation.reason || "Invalid parent element",
+      });
       return;
     }
+
+    // Clear any previous error message on valid click
+    setErrorMessage(null);
 
     const newId = addElementNode({
       tag: item.tag,
@@ -86,70 +109,93 @@ export const ElementsTab: React.FC = () => {
     }
   };
 
-  const filteredItems = useMemo(() => {
-    return ALL_ELEMENT_DEFINITIONS.filter((item) => {
-      const matchesSearch =
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.tag.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchQuery.toLowerCase());
+  const toggleCategoryCollapse = (categoryId: string) => {
+    setCollapsedCategories((prev) => ({
+      ...prev,
+      [categoryId]: !prev[categoryId],
+    }));
+  };
 
-      const matchesCategory =
-        selectedCategory === "all" || item.category === selectedCategory;
+  const visibleElements = useMemo(() => {
+    return ALL_ELEMENT_DEFINITIONS.filter((item) => showAdvanced || !item.isAdvanced);
+  }, [showAdvanced]);
 
-      // If user is searching or filtered by specific category, show all matching elements.
-      // In the default "All" view with no search, show core elements first unless showAdvanced is toggled.
-      const matchesTier =
-        searchQuery.trim().length > 0 ||
-        selectedCategory !== "all" ||
-        showAdvanced ||
-        !item.isAdvanced;
+  const groupedCategories = useMemo(() => {
+    const categoriesToInclude =
+      selectedCategory === "all"
+        ? ELEMENT_CATEGORIES
+        : ELEMENT_CATEGORIES.filter((c) => c.id === selectedCategory);
 
-      return matchesSearch && matchesCategory && matchesTier;
-    });
+    return categoriesToInclude
+      .map((cat) => ({
+        ...cat,
+        items: ALL_ELEMENT_DEFINITIONS.filter((item) => {
+          if (item.category !== cat.id) return false;
+
+          // Advanced flag filtering
+          if (!showAdvanced && item.isAdvanced) {
+            return false;
+          }
+
+          // Search query filtering
+          if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            const matchesSearch =
+              item.name.toLowerCase().includes(query) ||
+              item.tag.toLowerCase().includes(query) ||
+              item.description.toLowerCase().includes(query);
+            if (!matchesSearch) return false;
+          }
+
+          return true;
+        }),
+      }))
+      .filter((group) => group.items.length > 0);
   }, [searchQuery, selectedCategory, showAdvanced]);
 
-  const coreCount = ALL_ELEMENT_DEFINITIONS.filter((i) => !i.isAdvanced).length;
-  const totalCount = ALL_ELEMENT_DEFINITIONS.length;
+  const totalMatchingItems = useMemo(() => {
+    return groupedCategories.reduce((acc, group) => acc + group.items.length, 0);
+  }, [groupedCategories]);
 
   return (
     <div className="flex flex-col select-none">
       {/* Sticky Fixed Search & Filter Rail */}
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-md border-b border-border/60 p-3 space-y-2.5">
         <div className="relative">
-          <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <Search className="size-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search tags (<p>, <div>, <input>)..."
-            className="h-8 text-xs pl-8 bg-secondary/50 border-border/70 placeholder:text-muted-foreground focus-visible:ring-1"
+            className="h-8.5 text-xs pl-8.5 bg-secondary/50 border-border/70 placeholder:text-muted-foreground focus-visible:ring-1"
           />
         </div>
 
         {/* Category Filter Chips & Advanced Toggle */}
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 pb-2">
           <button
             type="button"
             onClick={() => setSelectedCategory("all")}
-            className={`text-[10px] px-2 py-0.8 rounded-full font-medium whitespace-nowrap transition-colors cursor-pointer border ${
+            className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
               selectedCategory === "all"
-                ? "bg-primary text-primary-foreground border-primary shadow-2xs"
-                : "bg-secondary/60 text-muted-foreground hover:text-foreground border-border/60"
+                ? "bg-foreground text-background font-semibold"
+                : "bg-secondary text-muted-foreground hover:text-foreground"
             }`}
           >
-            All ({showAdvanced || searchQuery ? totalCount : coreCount})
+            All ({visibleElements.length})
           </button>
           {ELEMENT_CATEGORIES.map((cat) => {
-            const count = ALL_ELEMENT_DEFINITIONS.filter((i) => i.category === cat.id).length;
+            const count = visibleElements.filter((i) => i.category === cat.id).length;
             const isSelected = selectedCategory === cat.id;
             return (
               <button
                 key={cat.id}
                 type="button"
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`text-[10px] px-2 py-0.8 rounded-full font-medium whitespace-nowrap transition-colors cursor-pointer border ${
+                className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
                   isSelected
-                    ? "bg-primary text-primary-foreground border-primary shadow-2xs"
-                    : "bg-secondary/60 text-muted-foreground hover:text-foreground border-border/60"
+                    ? "bg-foreground text-background font-semibold"
+                    : "bg-secondary text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {cat.label} ({count})
@@ -160,120 +206,188 @@ export const ElementsTab: React.FC = () => {
       </div>
 
       {/* Target Insertion Context & Advanced Toggle Bar */}
-      <div className="px-3 pt-2.5 pb-1 flex items-center justify-between text-[10px] text-muted-foreground border-b border-border/30 pb-2">
-        <span className="flex items-center gap-1 truncate max-w-[60%]">
-          <Layers className="size-3 text-sky-500 shrink-0" />
-          Target: <strong className="text-foreground font-medium truncate">{targetParentNode ? targetParentNode.name : "Page Root"}</strong>
+      <div className="px-3 pt-2.5 pb-1 flex items-center justify-between text-xs text-muted-foreground border-b border-border/40 pb-2">
+        <span className="flex items-center gap-1.5 truncate max-w-[60%]">
+          <Layers className="size-3.5 text-sky-500 shrink-0" />
+          Target: <strong className="text-foreground font-semibold truncate">{targetParentNode ? targetParentNode.name : "Page Root"}</strong>
         </span>
 
-        {selectedCategory === "all" && !searchQuery && (
-          <button
-            type="button"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors border ${
-              showAdvanced
-                ? "bg-secondary text-foreground border-border"
-                : "text-muted-foreground hover:text-foreground border-transparent hover:border-border/50"
-            }`}
-          >
-            <SlidersHorizontal className="size-2.5" />
-            {showAdvanced ? "All Tags" : "Core Tags"}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors border cursor-pointer shrink-0 ${
+            showAdvanced
+              ? "bg-foreground text-background border-foreground font-semibold shadow-xs"
+              : "text-muted-foreground hover:text-foreground border-border/70 hover:border-border bg-secondary/50"
+          }`}
+          title={showAdvanced ? "Showing all tags (including advanced/specialized)" : "Showing core tags only (click to show advanced)"}
+        >
+          <SlidersHorizontal className="size-3" />
+          {showAdvanced ? "All Tags" : "Core Tags"}
+        </button>
       </div>
 
-      {/* Element List */}
-      <div className="p-3 pt-2 flex flex-col gap-1.5">
-        {filteredItems.length > 0 ? (
-          filteredItems.map((item) => {
-            const isJustAdded = justAddedId === item.id;
-            const validation = canDropElementIntoParent(item, targetParentNode);
-            const hasError = errorMessage?.id === item.id;
+      {/* Persistent Error / Warning Alert Banner */}
+      {errorMessage && (
+        <div className="mx-3 mt-2.5 p-3 rounded-lg border border-amber-500/40 bg-amber-500/10 text-foreground flex items-start justify-between gap-2.5 shadow-sm animate-in fade-in-0 zoom-in-95">
+          <div className="flex items-start gap-2 min-w-0 flex-1">
+            <AlertCircle className="size-4 shrink-0 mt-0.5 text-amber-500" />
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-semibold text-foreground">
+                Cannot insert &lt;{errorMessage.tagName}&gt;
+              </span>
+              <span className="text-xs text-amber-700 dark:text-amber-300 font-medium leading-relaxed break-words mt-0.5">
+                {errorMessage.reason}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setErrorMessage(null)}
+            className="p-1 rounded-md hover:bg-amber-500/20 text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Grouped Category Elements List */}
+      <div className="p-3 pt-2.5 flex flex-col gap-4">
+        {groupedCategories.length > 0 ? (
+          groupedCategories.map((group) => {
+            const isCollapsed = Boolean(collapsedCategories[group.id]);
 
             return (
-              <Tooltip key={item.id} delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <div
-                    onClick={() => handleAddElement(item)}
-                    className={`group relative flex items-center justify-between p-2 rounded-lg border transition-all cursor-pointer select-none active:scale-[0.99] ${
-                      hasError
-                        ? "border-red-500/50 bg-red-500/10 text-red-500"
-                        : !validation.allowed
-                        ? "border-border/50 bg-card/30 opacity-70 hover:opacity-100 hover:border-border"
-                        : "border-border/80 bg-gradient-to-r from-card to-card/60 hover:from-card hover:to-secondary/40 hover:border-foreground/25 hover:shadow-xs"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div
-                        className={`w-7 h-7 rounded-md border flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 shadow-2xs ${item.accentColor}`}
-                      >
-                        {item.icon}
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 truncate">
-                          {item.name}
-                          <span className="text-[9px] font-mono font-medium text-muted-foreground bg-secondary/90 px-1 py-0.2 rounded-md shrink-0 border border-border/50">
-                            &lt;{item.tag}&gt;
-                          </span>
-                          {!validation.allowed && (
-                            <span className="text-[9px] text-amber-500/90 font-sans font-normal px-1 py-0.2 rounded bg-amber-500/10 border border-amber-500/20">
-                              Requires parent
-                            </span>
-                          )}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground truncate">
-                          {hasError ? errorMessage.reason : item.description}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center text-muted-foreground group-hover:text-foreground shrink-0 ml-1.5">
-                      {isJustAdded ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-500 font-medium bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                          <Check className="size-3" /> Added
-                        </span>
-                      ) : hasError ? (
-                        <AlertCircle className="size-3.5 text-red-500 animate-pulse" />
-                      ) : !validation.allowed ? (
-                        <div className="w-5 h-5 rounded flex items-center justify-center opacity-40 group-hover:opacity-100 text-amber-500">
-                          <AlertCircle className="size-3" />
-                        </div>
-                      ) : (
-                        <div className="w-5 h-5 rounded flex items-center justify-center opacity-40 group-hover:opacity-100 group-hover:bg-secondary transition-all">
-                          <Plus className="size-3.5" />
-                        </div>
-                      )}
-                    </div>
+              <div key={group.id} className="flex flex-col gap-2">
+                {/* Category Heading */}
+                <button
+                  type="button"
+                  onClick={() => toggleCategoryCollapse(group.id)}
+                  className="flex items-center justify-between px-1 py-1 rounded-md text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-secondary/40 transition-colors cursor-pointer group/cat border-b border-border/40 pb-1.5"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="shrink-0">{CATEGORY_ICONS[group.id]}</span>
+                    <span className="font-semibold text-foreground text-xs tracking-tight">
+                      {group.label}
+                    </span>
+                    <span className="text-[10px] font-mono font-medium text-muted-foreground bg-secondary/80 px-1.5 py-0.2 rounded-full border border-border/50">
+                      {group.items.length}
+                    </span>
                   </div>
-                </TooltipTrigger>
-                {!validation.allowed && validation.reason && (
-                  <TooltipContent side="right" className="text-xs max-w-56 text-amber-500">
-                    {validation.reason}
-                  </TooltipContent>
+                  <div className="text-muted-foreground group-hover/cat:text-foreground transition-transform">
+                    {isCollapsed ? (
+                      <ChevronRight className="size-3.5" />
+                    ) : (
+                      <ChevronDown className="size-3.5" />
+                    )}
+                  </div>
+                </button>
+
+                {/* Category Items */}
+                {!isCollapsed && (
+                  <div className="flex flex-col gap-2 pt-0.5">
+                    {group.items.map((item) => {
+                      const isJustAdded = justAddedId === item.id;
+                      const validation = canDropElementIntoParent(item, targetParentNode);
+                      const isItemInError = errorMessage?.id === item.id;
+                      const isAllowed = validation.allowed;
+
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => handleAddElement(item)}
+                          className={`group relative flex flex-col p-2.5 rounded-lg border transition-all select-none ${
+                            !isAllowed
+                              ? "cursor-not-allowed bg-secondary/15 border-border/50 hover:border-amber-500/40"
+                              : isItemInError
+                                ? "cursor-pointer border-amber-500/60 bg-amber-500/10 shadow-xs"
+                                : "cursor-pointer border-border/80 bg-gradient-to-r from-card to-card/60 hover:from-card hover:to-secondary/40 hover:border-foreground/25 hover:shadow-xs active:scale-[0.99]"
+                          }`}
+                        >
+                          {/* Main Card Header */}
+                          <div className="flex items-center justify-between gap-2 min-w-0 w-full">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <div
+                                className={`w-7.5 h-7.5 rounded-md border flex items-center justify-center shrink-0 transition-transform shadow-2xs ${
+                                  isAllowed ? "group-hover:scale-105" : "grayscale opacity-75"
+                                } ${item.accentColor}`}
+                              >
+                                {item.icon}
+                              </div>
+
+                              <div className="flex flex-col min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span
+                                    className={`text-xs font-semibold truncate ${
+                                      isAllowed ? "text-foreground" : "text-foreground/80"
+                                    }`}
+                                  >
+                                    {item.name}
+                                  </span>
+                                  <span className="text-[10px] font-mono font-medium text-foreground/75 bg-secondary/90 px-1.5 py-0.5 rounded-md shrink-0 border border-border/60">
+                                    &lt;{item.tag}&gt;
+                                  </span>
+                                </div>
+                                <span className="text-xs text-muted-foreground truncate leading-relaxed">
+                                  {item.description}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Action or Status Badge */}
+                            <div className="flex items-center justify-end shrink-0 ml-1">
+                              {isJustAdded ? (
+                                <span className="inline-flex items-center gap-1 text-xs text-emerald-500 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/25">
+                                  <Check className="size-3.5" /> Added
+                                </span>
+                              ) : !isAllowed ? (
+                                <div className="w-5.5 h-5.5 rounded flex items-center justify-center text-amber-500/80 bg-amber-500/10 border border-amber-500/20">
+                                  <Ban className="size-3.5" />
+                                </div>
+                              ) : (
+                                <div className="w-5.5 h-5.5 rounded flex items-center justify-center opacity-50 group-hover:opacity-100 group-hover:bg-secondary transition-all text-muted-foreground group-hover:text-foreground">
+                                  <Plus className="size-4" />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Inline constraint explanation */}
+                          {!isAllowed && validation.reason && (
+                            <div className="mt-2 pt-2 border-t border-border/40 text-xs flex items-start gap-1.5 leading-relaxed text-amber-700 dark:text-amber-300 font-medium">
+                              <AlertCircle className="size-3.5 shrink-0 text-amber-500 mt-0.5" />
+                              <span className="break-words flex-1">{validation.reason}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
-              </Tooltip>
+              </div>
             );
           })
         ) : (
           <div className="text-center py-8 text-xs text-muted-foreground space-y-1">
             <p>No elements matching &quot;{searchQuery}&quot;</p>
-            <p className="text-[11px] text-muted-foreground/70">
+            <p className="text-xs text-muted-foreground/70">
               Try searching for tag names like &lt;div&gt;, &lt;h1&gt;, or &lt;button&gt;.
             </p>
           </div>
         )}
 
         {/* Quick Tips */}
-        <div className="mt-2 p-2.5 rounded-lg border border-border/70 bg-gradient-to-br from-secondary/50 via-secondary/20 to-blue-500/5 text-xs text-muted-foreground flex flex-col gap-1 shadow-2xs">
-          <span className="font-semibold text-foreground flex items-center gap-1.5 text-[11px]">
-            <Sparkles className="size-3 text-amber-500" />
+        <div className="mt-2 p-3 rounded-lg border border-border/70 bg-gradient-to-br from-secondary/50 via-secondary/20 to-blue-500/5 text-xs text-muted-foreground flex flex-col gap-1.5 shadow-2xs">
+          <span className="font-semibold text-foreground flex items-center gap-1.5 text-xs">
+            <Sparkles className="size-3.5 text-amber-500" />
             Semantic HTML Insertion
           </span>
-          <span className="text-[10px] leading-relaxed">
-            Click elements to insert them into the active container. Specialized elements (like <code className="font-mono text-[9px] bg-secondary/80 px-1 py-0.5 rounded">&lt;li&gt;</code> or <code className="font-mono text-[9px] bg-secondary/80 px-1 py-0.5 rounded">&lt;option&gt;</code>) validate parent compatibility automatically.
+          <span className="text-xs leading-relaxed">
+            Click elements to insert them into the active container. Specialized elements (like <code className="font-mono text-[11px] bg-secondary px-1.5 py-0.5 rounded font-medium text-foreground">&lt;li&gt;</code> or <code className="font-mono text-[11px] bg-secondary px-1.5 py-0.5 rounded font-medium text-foreground">&lt;option&gt;</code>) activate when a valid parent container is targeted.
           </span>
         </div>
       </div>
     </div>
   );
 };
+

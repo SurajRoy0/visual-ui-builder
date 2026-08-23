@@ -39,4 +39,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-/visual-editor-ui-canvas-architecture.md
+/Canvas_editor_architecture.md
+/TASKS.md

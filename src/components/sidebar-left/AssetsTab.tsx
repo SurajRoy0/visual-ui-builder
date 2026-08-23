@@ -107,12 +107,12 @@ export const AssetsTab: React.FC = () => {
 
       <div className="p-3 flex flex-col gap-3">
         {/* Filter Tabs / Quick Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
           {(["all", "image", "svg", "font"] as const).map((filter) => (
             <button
               key={filter}
               onClick={() => setActiveFilter(filter)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-colors cursor-pointer shrink-0 ${
+              className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
                 activeFilter === filter
                   ? "bg-foreground text-background font-semibold"
                   : "bg-secondary text-muted-foreground hover:text-foreground"
