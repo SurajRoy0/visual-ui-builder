@@ -202,11 +202,10 @@ export const LayersTab: React.FC = () => {
         <div
           onClick={() => setSelectedLayerId(node.id)}
           style={{ paddingLeft: `${depth * 14 + 8}px` }}
-          className={`group flex items-center justify-between py-1.5 pr-2 rounded-md text-xs cursor-pointer select-none transition-all ${
-            isSelected
+          className={`group flex items-center justify-between py-1.5 pr-2 rounded-md text-xs cursor-pointer select-none transition-all ${isSelected
               ? "bg-[#242428] text-white dark:bg-[#242428] dark:text-white bg-[#ebebed] text-zinc-950 font-medium shadow-2xs"
               : "text-muted-foreground hover:text-foreground hover:bg-white/6 dark:hover:bg-white/6 hover:bg-black/4"
-          } ${isHidden ? "opacity-40" : ""}`}
+            } ${isHidden ? "opacity-40" : ""}`}
         >
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
             {hasChildren ? (
@@ -218,9 +217,8 @@ export const LayersTab: React.FC = () => {
                   e.stopPropagation();
                   toggleCollapse(node.id);
                 }}
-                className={`h-4 w-4 p-0 rounded-md cursor-pointer hover:bg-white/8 ${
-                  isSelected ? "text-white dark:text-white text-zinc-950" : "text-muted-foreground"
-                }`}
+                className={`h-4 w-4 p-0 rounded-md cursor-pointer hover:bg-white/8 ${isSelected ? "text-white dark:text-white text-zinc-950" : "text-muted-foreground"
+                  }`}
               >
                 {isCollapsed ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
               </Button>
@@ -229,9 +227,8 @@ export const LayersTab: React.FC = () => {
             )}
 
             <div
-              className={`p-0.5 rounded-md ${
-                isSelected ? "text-white dark:text-white text-zinc-950" : "text-muted-foreground"
-              }`}
+              className={`p-0.5 rounded-md ${isSelected ? "text-white dark:text-white text-zinc-950" : "text-muted-foreground"
+                }`}
             >
               {getNodeIcon(node.type)}
             </div>
@@ -239,11 +236,10 @@ export const LayersTab: React.FC = () => {
             <span className="truncate text-xs">{node.name}</span>
 
             <span
-              className={`text-[9px] font-mono uppercase px-1 py-0.2 rounded-md shrink-0 opacity-60 ${
-                isSelected
+              className={`text-[9px] font-mono uppercase px-1 py-0.2 rounded-md shrink-0 opacity-60 ${isSelected
                   ? "bg-white/12 dark:bg-white/12 bg-black/8 text-foreground font-semibold"
                   : "bg-secondary text-muted-foreground"
-              }`}
+                }`}
             >
               {node.tag}
             </span>
@@ -251,11 +247,10 @@ export const LayersTab: React.FC = () => {
 
           {/* Action icons on hover / state */}
           <div
-            className={`flex items-center gap-0.5 transition-opacity ${
-              isSelected || isHidden || isLocked
+            className={`flex items-center gap-0.5 transition-opacity ${isSelected || isHidden || isLocked
                 ? "opacity-100"
                 : "opacity-0 group-hover:opacity-100"
-            }`}
+              }`}
           >
             {/* Visibility Toggle */}
             <Tooltip>
@@ -263,11 +258,10 @@ export const LayersTab: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  className={`h-5 w-5 p-0 rounded-md ${
-                    isSelected
+                  className={`h-5 w-5 p-0 rounded-md ${isSelected
                       ? "hover:bg-white/12 text-white dark:text-white text-zinc-950"
                       : "hover:text-foreground hover:bg-white/8 text-muted-foreground"
-                  }`}
+                    }`}
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleHidden(node.id);
@@ -285,11 +279,10 @@ export const LayersTab: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  className={`h-5 w-5 p-0 rounded-md ${
-                    isSelected
+                  className={`h-5 w-5 p-0 rounded-md ${isSelected
                       ? "hover:bg-white/12 text-white dark:text-white text-zinc-950"
                       : "hover:text-foreground hover:bg-white/8 text-muted-foreground"
-                  }`}
+                    }`}
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleLocked(node.id);
@@ -307,11 +300,10 @@ export const LayersTab: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  className={`h-5 w-5 p-0 rounded-md ${
-                    isSelected
+                  className={`h-5 w-5 p-0 rounded-md ${isSelected
                       ? "hover:bg-white/12 text-white dark:text-white text-zinc-950"
                       : "hover:text-foreground hover:bg-white/8 text-muted-foreground"
-                  }`}
+                    }`}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Copy className="size-3" />
@@ -326,11 +318,10 @@ export const LayersTab: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="icon-xs"
-                  className={`h-5 w-5 p-0 rounded-md ${
-                    isSelected
+                  className={`h-5 w-5 p-0 rounded-md ${isSelected
                       ? "hover:bg-white/12 text-white dark:text-white text-zinc-950"
                       : "hover:text-foreground hover:bg-white/8 text-muted-foreground"
-                  }`}
+                    }`}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Trash2 className="size-3" />
@@ -354,21 +345,23 @@ export const LayersTab: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full divide-y divide-border">
-      {/* Pages Section */}
-      <div className="p-3 space-y-2.5">
-        {/* Search Bar */}
+    <div className="flex flex-col h-full">
+      {/* Sticky Fixed Search Bar */}
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-xs p-3 border-b border-border/50">
         <div className="relative">
           <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search layers & tags..."
-            className="h-7 text-xs pl-8 bg-secondary/50 border-border/70 placeholder:text-muted-foreground"
+            className="h-8 text-xs pl-8 bg-secondary/50 border-border/70 placeholder:text-muted-foreground"
           />
         </div>
+      </div>
 
-        <div className="flex items-center justify-between pt-1">
+      {/* Pages Section */}
+      <div className="p-3 space-y-2.5 border-b border-border">
+        <div className="flex items-center justify-between pt-0.5">
           <span className="text-xs font-semibold text-foreground px-1 tracking-tight">
             Pages
           </span>
@@ -386,11 +379,10 @@ export const LayersTab: React.FC = () => {
             <div
               key={page.id}
               onClick={() => setActivePage(page.id)}
-              className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-all ${
-                activePage === page.id
+              className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-all ${activePage === page.id
                   ? "bg-[#242428] text-white dark:bg-[#242428] dark:text-white bg-[#ebebed] text-zinc-950 font-medium shadow-2xs"
                   : "text-muted-foreground hover:text-foreground hover:bg-white/6 dark:hover:bg-white/6 hover:bg-black/4"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-2">
                 <span

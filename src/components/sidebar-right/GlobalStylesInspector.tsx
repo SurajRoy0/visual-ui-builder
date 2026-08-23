@@ -5,27 +5,16 @@ import {
   Palette,
   Type,
   Maximize,
-  Sparkles,
   SlidersHorizontal,
   Plus,
   Search,
   Code2,
   Trash2,
   Check,
-  ChevronDown,
-  ChevronRight,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
-import { ProjectStyles, TypographyToken, FontToken } from "@/types/project";
+import { ProjectStyles } from "@/types/project";
 
 const DEFAULT_PROJECT_STYLES: ProjectStyles = {
   colors: {
@@ -163,29 +152,28 @@ export const GlobalStylesInspector: React.FC = () => {
   const filteredRadii = Object.entries(styles.radii).filter(([k, v]) =>
     matchesFilter(k, String(v))
   );
-  const filteredShadows = Object.entries(styles.shadows).filter(([k, v]) => matchesFilter(k, v));
   const filteredVars = Object.entries(styles.variables).filter(([k, v]) =>
     matchesFilter(k, String(v))
   );
 
   return (
-    <div className="flex flex-col divide-y divide-border">
-      {/* Search Header */}
-      <div className="p-3 bg-secondary/20">
+    <div className="flex flex-col">
+      {/* Sticky Fixed Search Bar */}
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-xs p-3 border-b border-border/50">
         <div className="relative">
           <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search global styles & tokens..."
-            className="h-7 text-xs pl-8 bg-secondary/50 border-border/70 placeholder:text-muted-foreground"
+            className="h-8 text-xs pl-8 bg-secondary/50 border-border/70 placeholder:text-muted-foreground"
           />
         </div>
       </div>
 
       {/* 1. Colors Palette */}
       {(filteredColors.length > 0 || !q) && (
-        <section className="p-3.5 space-y-2.5">
+        <section className="p-3.5 space-y-2.5 border-b border-border/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
               <Palette className="size-3.5 text-blue" />
@@ -195,7 +183,7 @@ export const GlobalStylesInspector: React.FC = () => {
               variant="ghost"
               size="xs"
               onClick={() => setIsAddingColor(!isAddingColor)}
-              className="h-5 text-[10px] gap-1 px-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
+              className="h-6 text-[10px] gap-1 px-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
             >
               <Plus className="size-3" />
               Add
@@ -204,19 +192,19 @@ export const GlobalStylesInspector: React.FC = () => {
 
           {/* New Color Token Form */}
           {isAddingColor && (
-            <div className="p-2 rounded-md bg-secondary/50 border border-border space-y-2">
+            <div className="p-2.5 rounded-md bg-secondary/50 border border-border space-y-2">
               <div className="flex items-center gap-2">
                 <Input
                   value={newColorKey}
                   onChange={(e) => setNewColorKey(e.target.value)}
                   placeholder="token-name (e.g. brand-accent)"
-                  className="h-7 text-xs flex-1"
+                  className="h-8 text-xs flex-1"
                 />
                 <input
                   type="color"
                   value={newColorVal}
                   onChange={(e) => setNewColorVal(e.target.value)}
-                  className="w-7 h-7 rounded border border-border cursor-pointer bg-transparent"
+                  className="w-8 h-8 rounded border border-border cursor-pointer bg-transparent"
                 />
               </div>
               <div className="flex justify-end gap-1.5">
@@ -224,7 +212,7 @@ export const GlobalStylesInspector: React.FC = () => {
                   variant="ghost"
                   size="xs"
                   onClick={() => setIsAddingColor(false)}
-                  className="h-6 text-[10px]"
+                  className="h-7 text-[10px]"
                 >
                   Cancel
                 </Button>
@@ -232,7 +220,7 @@ export const GlobalStylesInspector: React.FC = () => {
                   variant="default"
                   size="xs"
                   onClick={handleAddColor}
-                  className="h-6 text-[10px] gap-1"
+                  className="h-7 text-[10px] gap-1"
                 >
                   <Check className="size-3" /> Save Token
                 </Button>
@@ -284,7 +272,7 @@ export const GlobalStylesInspector: React.FC = () => {
 
       {/* 2. Typography & Fonts */}
       {(filteredTypography.length > 0 || !q) && (
-        <section className="p-3.5 space-y-2.5">
+        <section className="p-3.5 space-y-2.5 border-b border-border/50">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
             <Type className="size-3.5 text-purple-500" />
             <span>Typography Hierarchy</span>
@@ -321,7 +309,7 @@ export const GlobalStylesInspector: React.FC = () => {
 
       {/* 3. Spacing Scale */}
       {(filteredSpacing.length > 0 || !q) && (
-        <section className="p-3.5 space-y-2.5">
+        <section className="p-3.5 space-y-2.5 border-b border-border/50">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
             <Maximize className="size-3.5 text-emerald-500" />
             <span>Spacing Scale</span>
@@ -343,7 +331,7 @@ export const GlobalStylesInspector: React.FC = () => {
 
       {/* 4. Border Radius (Radii) */}
       {(filteredRadii.length > 0 || !q) && (
-        <section className="p-3.5 space-y-2.5">
+        <section className="p-3.5 space-y-2.5 border-b border-border/50">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
             <SlidersHorizontal className="size-3.5 text-amber-500" />
             <span>Border Radii</span>
@@ -369,7 +357,7 @@ export const GlobalStylesInspector: React.FC = () => {
 
       {/* 5. Custom CSS Variables */}
       {(filteredVars.length > 0 || !q) && (
-        <section className="p-3.5 space-y-2.5">
+        <section className="p-3.5 space-y-2.5 border-b border-border/50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
               <Code2 className="size-3.5 text-blue" />
@@ -379,7 +367,7 @@ export const GlobalStylesInspector: React.FC = () => {
               variant="ghost"
               size="xs"
               onClick={() => setIsAddingVar(!isAddingVar)}
-              className="h-5 text-[10px] gap-1 px-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
+              className="h-6 text-[10px] gap-1 px-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
             >
               <Plus className="size-3" />
               Add
@@ -388,25 +376,25 @@ export const GlobalStylesInspector: React.FC = () => {
 
           {/* New Variable Form */}
           {isAddingVar && (
-            <div className="p-2 rounded-md bg-secondary/50 border border-border space-y-2">
+            <div className="p-2.5 rounded-md bg-secondary/50 border border-border space-y-2">
               <Input
                 value={newVarKey}
                 onChange={(e) => setNewVarKey(e.target.value)}
                 placeholder="--var-name (e.g. --brand-glow)"
-                className="h-7 text-xs"
+                className="h-8 text-xs"
               />
               <Input
                 value={newVarVal}
                 onChange={(e) => setNewVarVal(e.target.value)}
                 placeholder="CSS Value (e.g. 0 0 20px #3b82f6)"
-                className="h-7 text-xs"
+                className="h-8 text-xs"
               />
               <div className="flex justify-end gap-1.5">
                 <Button
                   variant="ghost"
                   size="xs"
                   onClick={() => setIsAddingVar(false)}
-                  className="h-6 text-[10px]"
+                  className="h-7 text-[10px]"
                 >
                   Cancel
                 </Button>
@@ -414,7 +402,7 @@ export const GlobalStylesInspector: React.FC = () => {
                   variant="default"
                   size="xs"
                   onClick={handleAddVar}
-                  className="h-6 text-[10px] gap-1"
+                  className="h-7 text-[10px] gap-1"
                 >
                   <Check className="size-3" /> Save Variable
                 </Button>

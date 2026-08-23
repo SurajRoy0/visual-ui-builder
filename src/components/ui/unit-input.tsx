@@ -161,7 +161,7 @@ export const UnitInput: React.FC<UnitInputProps> = ({
   return (
     <div
       className={cn(
-        "group relative flex items-center h-7 w-full rounded-md border border-input bg-background/50 hover:bg-background focus-within:bg-background focus-within:ring-1 focus-within:ring-ring transition-all overflow-hidden shadow-2xs",
+        "group relative flex items-center h-8 w-full rounded-md border border-input bg-background/50 hover:bg-background focus-within:bg-background focus-within:ring-1 focus-within:ring-ring transition-all overflow-hidden shadow-2xs",
         disabled && "opacity-50 pointer-events-none",
         className
       )}

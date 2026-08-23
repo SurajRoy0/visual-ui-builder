@@ -186,38 +186,42 @@ export const ElementsTab: React.FC = () => {
   };
 
   return (
-    <div className="p-3 flex flex-col gap-3">
-      {/* Search Bar */}
-      <div className="relative">
-        <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-        <Input
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search elements & tags..."
-          className="h-7 text-xs pl-8 bg-secondary/50 border-border/70 placeholder:text-muted-foreground"
-        />
+    <div className="flex flex-col">
+      {/* Sticky Fixed Search Bar */}
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-xs p-3 border-b border-border/50">
+        <div className="relative">
+          <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search elements & tags..."
+            className="h-8 text-xs pl-8 bg-secondary/50 border-border/70 placeholder:text-muted-foreground"
+          />
+        </div>
       </div>
 
-      {/* Elements Groups */}
-      {filteredPrimitives.length > 0 ? (
-        <div className="space-y-3.5">
-          {renderPrimitiveGroup("Layout Primitives", layoutPrimitives)}
-          {renderPrimitiveGroup("Typography", typographyPrimitives)}
-          {renderPrimitiveGroup("Interactive & Media", mediaPrimitives)}
-        </div>
-      ) : (
-        <div className="text-center py-6 text-xs text-muted-foreground">
-          No elements matching &quot;{searchQuery}&quot;
-        </div>
-      )}
+      {/* Elements Groups Content */}
+      <div className="p-3 flex flex-col gap-3.5">
+        {filteredPrimitives.length > 0 ? (
+          <div className="space-y-3.5">
+            {renderPrimitiveGroup("Layout Primitives", layoutPrimitives)}
+            {renderPrimitiveGroup("Typography", typographyPrimitives)}
+            {renderPrimitiveGroup("Interactive & Media", mediaPrimitives)}
+          </div>
+        ) : (
+          <div className="text-center py-6 text-xs text-muted-foreground">
+            No elements matching &quot;{searchQuery}&quot;
+          </div>
+        )}
 
-      {/* Quick Tips */}
-      <div className="mt-1 p-2.5 rounded-md border border-border bg-secondary/30 text-[11px] text-muted-foreground flex flex-col gap-1">
-        <span className="font-semibold text-foreground flex items-center gap-1">
-          💡 Quick Tips:
-        </span>
-        <span>• Click an element to insert into the canvas.</span>
-        <span>• Drag and drop directly onto the visual canvas.</span>
+        {/* Quick Tips */}
+        <div className="mt-1 p-2.5 rounded-md border border-border bg-secondary/30 text-[11px] text-muted-foreground flex flex-col gap-1">
+          <span className="font-semibold text-foreground flex items-center gap-1">
+            💡 Quick Tips:
+          </span>
+          <span>• Click an element to insert into the canvas.</span>
+          <span>• Drag and drop directly onto the visual canvas.</span>
+        </div>
       </div>
     </div>
   );
