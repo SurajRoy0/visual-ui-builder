@@ -20,6 +20,7 @@ import type { ElementNode } from "@/types/project";
 
 export function useEditorKeyboardShortcuts() {
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
+  const activeBreakpointId = useEditorStore((state) => state.activeBreakpointId);
   const setSelectedNodeId = useEditorStore((state) => state.setSelectedNodeId);
   const setZoom = useEditorStore((state) => state.setZoom);
   const resetZoom = useEditorStore((state) => state.resetZoom);
@@ -29,9 +30,11 @@ export function useEditorKeyboardShortcuts() {
 
   const elements = useProjectStore((state) => state.project.elements);
   const pages = useProjectStore((state) => state.project.pages);
+  const breakpoints = useProjectStore((state) => state.project.breakpoints);
   const removeNode = useProjectStore((state) => state.removeNode);
   const duplicateNode = useProjectStore((state) => state.duplicateNode);
   const updateNodeStyle = useProjectStore((state) => state.updateNodeStyle);
+  const updateBreakpointStyle = useProjectStore((state) => state.updateBreakpointStyle);
   const undo = useProjectStore((state) => state.undo);
   const redo = useProjectStore((state) => state.redo);
   const canUndo = useProjectStore((state) => state.past.length > 0);
@@ -168,9 +171,24 @@ export function useEditorKeyboardShortcuts() {
         const node = elements[selectedNodeId] as ElementNode | undefined;
         if (!node || node.type !== "element") return;
 
-        const delta = e.shiftKey ? 10 : 1;
-        const style = node.style || {};
+        const activeBreakpoint =
+          breakpoints.find((b) => b.id === activeBreakpointId) ||
+          breakpoints[0] || { id: "bp-desktop", name: "Desktop", minWidth: 1200, isDefault: true };
+        const isDefaultBreakpoint = activeBreakpoint.isDefault ?? (activeBreakpoint.minWidth >= 1200);
+
+        const bpOverrides = (node.breakpointStyles?.[activeBreakpointId] || {}) as Partial<ElementNode["style"]>;
+        const style = { ...(node.style || {}), ...bpOverrides };
         const isAbsolute = style.position === "absolute";
+
+        const delta = e.shiftKey ? 10 : 1;
+
+        const applyStylePatch = (patch: Partial<ElementNode["style"]>) => {
+          if (isDefaultBreakpoint) {
+            updateNodeStyle(selectedNodeId, patch);
+          } else {
+            updateBreakpointStyle(selectedNodeId, activeBreakpointId, patch);
+          }
+        };
 
         if (isAbsolute) {
           let left = parseInt(String(style.left || "0"), 10) || 0;
@@ -181,7 +199,7 @@ export function useEditorKeyboardShortcuts() {
           if (e.key === "ArrowUp") top -= delta;
           if (e.key === "ArrowDown") top += delta;
 
-          updateNodeStyle(selectedNodeId, {
+          applyStylePatch({
             left: `${left}px`,
             top: `${top}px`,
           });
@@ -195,7 +213,7 @@ export function useEditorKeyboardShortcuts() {
           if (e.key === "ArrowUp") marginTop -= delta;
           if (e.key === "ArrowDown") marginTop += delta;
 
-          updateNodeStyle(selectedNodeId, {
+          applyStylePatch({
             marginLeft: `${marginLeft}px`,
             marginTop: `${marginTop}px`,
           });
@@ -229,8 +247,10 @@ export function useEditorKeyboardShortcuts() {
     };
   }, [
     selectedNodeId,
+    activeBreakpointId,
     elements,
     pages,
+    breakpoints,
     setSelectedNodeId,
     setZoom,
     resetZoom,
@@ -240,6 +260,7 @@ export function useEditorKeyboardShortcuts() {
     removeNode,
     duplicateNode,
     updateNodeStyle,
+    updateBreakpointStyle,
     undo,
     redo,
     canUndo,

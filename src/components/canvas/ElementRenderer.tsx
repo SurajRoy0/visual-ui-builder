@@ -33,8 +33,11 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
     | undefined;
 
   const activeBreakpointId = useEditorStore((state) => state.activeBreakpointId);
+  const activeViewportId = useEditorStore((state) => state.activeViewportId);
+  const viewportWidth = useEditorStore((state) => state.viewportWidth);
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
   const setSelectedNodeId = useEditorStore((state) => state.setSelectedNodeId);
+  const viewports = useProjectStore((state) => state.project.viewports);
   const addElementNode = useProjectStore((state) => state.addElementNode);
 
   if (!node) {
@@ -61,10 +64,22 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
   const elementNode = node as ElementNode;
   const isSelected = selectedNodeId === nodeId;
 
-  // Resolve effective style for active breakpoint
+  const activeViewport =
+    viewports.find((v) => v.id === activeViewportId) ||
+    viewports[0] || { id: "vp-desktop", width: 1440, height: 900, name: "Desktop" };
+
+  const currentDisplayWidth = viewportWidth ?? activeViewport.width;
+
+  const simulatedViewport = {
+    width: currentDisplayWidth,
+    height: activeViewport.height,
+  };
+
+  // Resolve effective style for active breakpoint and simulated viewport
   const effectiveStyles = resolveEffectiveStyles(
     elementNode.style,
-    elementNode.breakpointStyles?.[activeBreakpointId]
+    elementNode.breakpointStyles?.[activeBreakpointId],
+    simulatedViewport
   );
 
   const handleClick = (e: React.MouseEvent) => {

@@ -91,7 +91,7 @@ export const BreakpointBar: React.FC = () => {
   return (
     <div className="flex items-center gap-1.5">
       <Tabs
-        value={activeTabId}
+        value={activeBreakpointId || activeTabId}
         onValueChange={(val) => {
           if (val) handleTabChange(val);
         }}

@@ -38,10 +38,13 @@ const HANDLES: { dir: ResizeHandleDirection; cursor: string; className: string }
 
 export const SelectionOverlay: React.FC = () => {
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
+  const activeBreakpointId = useEditorStore((state) => state.activeBreakpointId);
   const zoom = useEditorStore((state) => state.zoom);
   const elements = useProjectStore((state) => state.project.elements);
   const pages = useProjectStore((state) => state.project.pages);
+  const breakpoints = useProjectStore((state) => state.project.breakpoints);
   const updateNodeStyle = useProjectStore((state) => state.updateNodeStyle);
+  const updateBreakpointStyle = useProjectStore((state) => state.updateBreakpointStyle);
 
   const [overlayRect, setOverlayRect] = useState<Rect | null>(null);
   const [activeHandle, setActiveHandle] = useState<ResizeHandleDirection | null>(null);
@@ -53,7 +56,18 @@ export const SelectionOverlay: React.FC = () => {
 
   const isRoot = selectedNodeId ? isPageRoot(pages, selectedNodeId) : false;
   const selectedNode = selectedNodeId ? (elements[selectedNodeId] as ElementNode | undefined) : null;
-  const nodeStyleKey = selectedNode?.style ? JSON.stringify(selectedNode.style) : "";
+
+  const activeBreakpoint =
+    breakpoints.find((b) => b.id === activeBreakpointId) ||
+    breakpoints[0] || { id: "bp-desktop", name: "Desktop", minWidth: 1200, isDefault: true };
+  const isDefaultBreakpoint = activeBreakpoint.isDefault ?? (activeBreakpoint.minWidth >= 1200);
+
+  const nodeStyleKey = selectedNode
+    ? JSON.stringify({
+        style: selectedNode.style,
+        bp: selectedNode.breakpointStyles?.[activeBreakpointId],
+      })
+    : "";
 
   // Sync overlay position with rendered element's DOM bounding rect
   const updateOverlayPosition = useCallback(() => {
@@ -245,10 +259,17 @@ export const SelectionOverlay: React.FC = () => {
 
       // Commit final dimensions to ProjectStore (ONE history entry)
       if (selectedNodeId) {
-        updateNodeStyle(selectedNodeId, {
-          width: `${latestWidth}px`,
-          height: `${latestHeight}px`,
-        });
+        if (isDefaultBreakpoint) {
+          updateNodeStyle(selectedNodeId, {
+            width: `${latestWidth}px`,
+            height: `${latestHeight}px`,
+          });
+        } else {
+          updateBreakpointStyle(selectedNodeId, activeBreakpointId, {
+            width: `${latestWidth}px`,
+            height: `${latestHeight}px`,
+          });
+        }
       }
 
       updateOverlayPosition();

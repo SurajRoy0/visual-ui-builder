@@ -59,6 +59,17 @@ export interface ElementsSlice {
         patch: Partial<ElementStyle>
     ) => void;
 
+    removeBreakpointStyleProperty: (
+        nodeId: ID,
+        breakpointId: ID,
+        propertyKey: string
+    ) => void;
+
+    clearBreakpointOverrides: (
+        nodeId: ID,
+        breakpointId: ID
+    ) => void;
+
     updateNodeAttributes: (
         nodeId: ID,
         patch: Record<string, unknown>
@@ -578,6 +589,48 @@ export const createElementsSlice: StateCreator<
                 ],
                 ...patch,
             };
+        });
+    },
+
+    // ==========================================================
+    // Remove breakpoint style property
+    // ==========================================================
+
+    removeBreakpointStyleProperty: (
+        nodeId,
+        breakpointId,
+        propertyKey
+    ) => {
+        get().mutate((draft) => {
+            const node = draft.elements[nodeId];
+            if (!node || node.type !== "element") return;
+
+            if (node.breakpointStyles?.[breakpointId]) {
+                delete (node.breakpointStyles[breakpointId] as Record<string, unknown>)[propertyKey];
+
+                // If empty, clean up the breakpoint key
+                if (Object.keys(node.breakpointStyles[breakpointId]).length === 0) {
+                    delete node.breakpointStyles[breakpointId];
+                }
+            }
+        });
+    },
+
+    // ==========================================================
+    // Clear all breakpoint overrides for a node
+    // ==========================================================
+
+    clearBreakpointOverrides: (
+        nodeId,
+        breakpointId
+    ) => {
+        get().mutate((draft) => {
+            const node = draft.elements[nodeId];
+            if (!node || node.type !== "element") return;
+
+            if (node.breakpointStyles?.[breakpointId]) {
+                delete node.breakpointStyles[breakpointId];
+            }
         });
     },
 

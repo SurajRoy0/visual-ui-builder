@@ -322,7 +322,9 @@ export const CanvasContainer: React.FC = () => {
               style={{
                 width: `${currentDisplayWidth}px`,
                 minHeight: `${activeViewport.height}px`,
-              }}
+                ["--vw" as string]: `${currentDisplayWidth / 100}px`,
+                ["--vh" as string]: `${activeViewport.height / 100}px`,
+              } as React.CSSProperties}
               className="relative shadow-2xl rounded-md bg-background ring-1 ring-border flex flex-col"
             >
               {/* Live Canvas Document Tree */}
