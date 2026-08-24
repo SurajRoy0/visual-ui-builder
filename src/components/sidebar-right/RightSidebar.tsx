@@ -8,6 +8,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { Sliders, Globe } from "lucide-react";
 import { useEditorStore } from "@/store/editor/editorStore";
 import { useProjectStore } from "@/store/project/projectStore";
+import { generateTokenCssVars } from "@/lib/styleUtils";
 
 type RightTab = "element" | "global";
 
@@ -15,10 +16,14 @@ export const RightSidebar: React.FC = () => {
   const [activeTab, setActiveTab] = useState<RightTab>("element");
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
   const elements = useProjectStore((state) => state.project.elements);
+  const projectStyles = useProjectStore((state) => state.project.styles);
   const selectedNode = selectedNodeId ? elements[selectedNodeId] : null;
 
-  // Dynamic tab label: shows the currently selected element name (e.g. "Box", "Heading", "Button", etc.)
-  const selectedItemLabel = selectedNode?.name || "Box";
+  const tokenCssVars = React.useMemo(() => generateTokenCssVars(projectStyles), [projectStyles]);
+
+  // Dynamic tab label: shows the currently selected element name or "Page Root"
+  const isRoot = selectedNodeId === "root" || (selectedNode && "isRoot" in selectedNode && Boolean(selectedNode.isRoot));
+  const selectedItemLabel = isRoot ? "Page Root" : (selectedNode?.name || (selectedNode && "tag" in selectedNode ? (selectedNode.tag as string) : "Element") || "Page Root");
 
   const tabs: { id: RightTab; label: string; icon: React.ReactNode }[] = [
     { id: "element", label: selectedItemLabel, icon: <Sliders className="size-4 text-indigo-400" /> },
@@ -26,7 +31,10 @@ export const RightSidebar: React.FC = () => {
   ];
 
   return (
-    <aside className="w-80 h-full flex flex-col border-l border-border shrink-0 z-10 select-none bg-background text-foreground overflow-hidden">
+    <aside
+      style={tokenCssVars as React.CSSProperties}
+      className="w-96 h-full flex flex-col border-l border-border shrink-0 z-10 select-none bg-background text-foreground overflow-hidden"
+    >
       <Tabs
         value={activeTab}
         onValueChange={(value) => setActiveTab(value as RightTab)}

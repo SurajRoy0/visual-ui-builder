@@ -7,6 +7,7 @@ import type { ElementsSlice } from "./elementsSlice";
 import type { AnimationSlice } from "./animationSlice";
 import type { ActionsSlice } from "./actionsSlice";
 import type { ViewportSlice } from "./viewportSlice";
+import type { StylesSlice } from "./stylesSlice";
 
 /**
  * Complete Zustand store.
@@ -20,6 +21,7 @@ import type { ViewportSlice } from "./viewportSlice";
  * get().createTimeline()
  * get().createAction()
  * get().createViewport()
+ * get().setColorToken()
  *
  * without circular runtime imports.
  */
@@ -28,4 +30,5 @@ export type ProjectStoreState =
     ElementsSlice &
     AnimationSlice &
     ActionsSlice &
-    ViewportSlice;
+    ViewportSlice &
+    StylesSlice;

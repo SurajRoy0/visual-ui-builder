@@ -12,7 +12,7 @@
 
 "use client";
 
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useMemo } from "react";
 import { CanvasRenderer } from "./CanvasRenderer";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { DropIndicatorOverlay } from "./DropIndicatorOverlay";
@@ -48,6 +48,7 @@ export const CanvasContainer: React.FC = () => {
   const breakpoints = useProjectStore((state) => state.project.breakpoints);
   const pages = useProjectStore((state) => state.project.pages);
   const elements = useProjectStore((state) => state.project.elements);
+  const projectStyles = useProjectStore((state) => state.project.styles);
   const updateViewport = useProjectStore((state) => state.updateViewport);
   const addElementNode = useProjectStore((state) => state.addElementNode);
   const updateNodeStyle = useProjectStore((state) => state.updateNodeStyle);
@@ -69,6 +70,57 @@ export const CanvasContainer: React.FC = () => {
     viewports[0] || { id: "vp-desktop", width: 1440, height: 900, name: "Desktop" };
 
   const currentDisplayWidth = viewportWidth ?? activeViewport.width;
+
+  // Generate CSS variables for all project design tokens
+  const tokenCssVars: Record<string, string> = useMemo(() => {
+    const vars: Record<string, string> = {};
+    if (!projectStyles) return vars;
+
+    // Colors: --color-[name]
+    if (projectStyles.colors) {
+      for (const [k, v] of Object.entries(projectStyles.colors)) {
+        vars[`--color-${k}`] = v;
+      }
+    }
+
+    // Spacing: --spacing-[name]
+    if (projectStyles.spacing) {
+      for (const [k, v] of Object.entries(projectStyles.spacing)) {
+        vars[`--spacing-${k}`] = typeof v === "number" ? `${v}px` : String(v);
+      }
+    }
+
+    // Radii: --radius-[name]
+    if (projectStyles.radii) {
+      for (const [k, v] of Object.entries(projectStyles.radii)) {
+        vars[`--radius-${k}`] = typeof v === "number" ? `${v}px` : String(v);
+      }
+    }
+
+    // Shadows: --shadow-[name]
+    if (projectStyles.shadows) {
+      for (const [k, v] of Object.entries(projectStyles.shadows)) {
+        vars[`--shadow-${k}`] = v;
+      }
+    }
+
+    // Fonts: --font-[name]
+    if (projectStyles.fonts) {
+      for (const [k, v] of Object.entries(projectStyles.fonts)) {
+        vars[`--font-${k}`] = v.fallback ? `${v.family}, ${v.fallback}` : v.family;
+      }
+    }
+
+    // Variables: --[name]
+    if (projectStyles.variables) {
+      for (const [k, v] of Object.entries(projectStyles.variables)) {
+        const name = k.startsWith("--") ? k : `--${k}`;
+        vars[name] = typeof v === "number" ? `${v}px` : String(v);
+      }
+    }
+
+    return vars;
+  }, [projectStyles]);
 
   const handleCanvasBackgroundClick = (e: React.MouseEvent) => {
     // Only deselect if clicked directly on the backdrop area and not in pan mode
@@ -280,13 +332,12 @@ export const CanvasContainer: React.FC = () => {
         ref={scrollContainerRef}
         onPointerDown={handlePanPointerDown}
         onClick={handleCanvasBackgroundClick}
-        className={`flex-1 overflow-auto flex items-start justify-center p-8 relative ${
-          isPanningActive
+        className={`flex-1 overflow-auto flex items-start justify-center p-8 relative ${isPanningActive
             ? isPanningInProgress
               ? "cursor-grabbing select-none"
               : "cursor-grab select-none"
             : ""
-        }`}
+          }`}
       >
         <div
           className="relative flex flex-col items-center origin-top my-auto"
@@ -299,16 +350,14 @@ export const CanvasContainer: React.FC = () => {
             <div
               title="Drag to resize viewport width"
               onPointerDown={(e) => handlePointerDown("left", e)}
-              className={`w-4 flex items-center justify-center cursor-ew-resize group select-none relative -mr-2 z-30 transition-all ${
-                isDraggingHandle === "left" ? "opacity-100 scale-105" : ""
-              }`}
+              className={`w-4 flex items-center justify-center cursor-ew-resize group select-none relative -mr-2 z-30 transition-all ${isDraggingHandle === "left" ? "opacity-100 scale-105" : ""
+                }`}
             >
               <div
-                className={`w-1.5 h-16 rounded-full transition-all ${
-                  isDraggingHandle === "left"
+                className={`w-1.5 h-16 rounded-full transition-all ${isDraggingHandle === "left"
                     ? "bg-blue-500 shadow-md shadow-blue-500/50 scale-y-110"
                     : "bg-border group-hover:bg-blue-500/80 group-hover:scale-y-110"
-                }`}
+                  }`}
               />
             </div>
 
@@ -324,14 +373,14 @@ export const CanvasContainer: React.FC = () => {
                 minHeight: `${activeViewport.height}px`,
                 ["--vw" as string]: `${currentDisplayWidth / 100}px`,
                 ["--vh" as string]: `${activeViewport.height / 100}px`,
+                ...tokenCssVars,
               } as React.CSSProperties}
               className="relative shadow-2xl rounded-md bg-background ring-1 ring-border flex flex-col"
             >
               {/* Live Canvas Document Tree */}
               <div
-                className={`w-full min-h-full flex-1 flex flex-col rounded-md overflow-hidden ${
-                  isPanningActive ? "pointer-events-none select-none" : ""
-                }`}
+                className={`w-full min-h-full flex-1 flex flex-col rounded-md overflow-hidden ${isPanningActive ? "pointer-events-none select-none" : ""
+                  }`}
               >
                 <CanvasRenderer />
               </div>
@@ -350,16 +399,14 @@ export const CanvasContainer: React.FC = () => {
             <div
               title="Drag to resize viewport width"
               onPointerDown={(e) => handlePointerDown("right", e)}
-              className={`w-4 flex items-center justify-center cursor-ew-resize group select-none relative -ml-2 z-30 transition-all ${
-                isDraggingHandle === "right" ? "opacity-100 scale-105" : ""
-              }`}
+              className={`w-4 flex items-center justify-center cursor-ew-resize group select-none relative -ml-2 z-30 transition-all ${isDraggingHandle === "right" ? "opacity-100 scale-105" : ""
+                }`}
             >
               <div
-                className={`w-1.5 h-16 rounded-full transition-all ${
-                  isDraggingHandle === "right"
+                className={`w-1.5 h-16 rounded-full transition-all ${isDraggingHandle === "right"
                     ? "bg-blue-500 shadow-md shadow-blue-500/50 scale-y-110"
                     : "bg-border group-hover:bg-blue-500/80 group-hover:scale-y-110"
-                }`}
+                  }`}
               />
             </div>
           </div>

@@ -12,4 +12,5 @@ export * from "./actionsSlice";
 export * from "./animationSlice";
 export * from "./documentSlice";
 export * from "./elementsSlice";
+export * from "./stylesSlice";
 

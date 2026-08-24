@@ -299,9 +299,10 @@ export const ElementsTab: React.FC = () => {
                           draggable={true}
                           onDragStart={(e) => {
                             setGlobalDraggedDefinition(item);
+                            const { icon: _icon, ...serializableItem } = item;
                             e.dataTransfer.setData(
                               "application/x-playfull-element",
-                              JSON.stringify(item)
+                              JSON.stringify(serializableItem)
                             );
                             e.dataTransfer.effectAllowed = "copy";
                           }}

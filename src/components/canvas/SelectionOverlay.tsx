@@ -71,7 +71,7 @@ export const SelectionOverlay: React.FC = () => {
 
   // Sync overlay position with rendered element's DOM bounding rect
   const updateOverlayPosition = useCallback(() => {
-    if (!selectedNodeId || isRoot) {
+    if (!selectedNodeId) {
       setOverlayRect(null);
       return;
     }
@@ -91,11 +91,11 @@ export const SelectionOverlay: React.FC = () => {
     const relative = getRelativeElementRect(elementRect, viewportRect, zoom || 1);
 
     setOverlayRect(relative);
-  }, [selectedNodeId, isRoot, zoom]);
+  }, [selectedNodeId, zoom]);
 
   // Track DOM element resizing and viewport layout changes
   useEffect(() => {
-    if (!selectedNodeId || isRoot) return;
+    if (!selectedNodeId) return;
 
     const domEl = document.querySelector<HTMLElement>(`[data-node-id="${selectedNodeId}"]`);
     if (!domEl) return;
@@ -119,28 +119,22 @@ export const SelectionOverlay: React.FC = () => {
       window.removeEventListener("scroll", updateOverlayPosition, true);
       window.removeEventListener("resize", updateOverlayPosition);
     };
-  }, [selectedNodeId, isRoot, updateOverlayPosition]);
+  }, [selectedNodeId, updateOverlayPosition]);
 
   // Update overlay immediately when zoom or element style (position, margin, size) mutates
   useEffect(() => {
-    if (!selectedNodeId || isRoot) return;
-
     const frameId = requestAnimationFrame(() => {
       updateOverlayPosition();
     });
-
-    return () => {
-      cancelAnimationFrame(frameId);
-    };
-  }, [zoom, nodeStyleKey, selectedNodeId, isRoot, updateOverlayPosition]);
+    return () => cancelAnimationFrame(frameId);
+  }, [zoom, nodeStyleKey, activeBreakpointId, updateOverlayPosition]);
 
   // Track keyboard arrow movement to hide handles temporarily while nudging
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
         ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key) &&
-        selectedNodeId &&
-        !isRoot
+        selectedNodeId
       ) {
         setIsMoving(true);
         if (movingTimeoutRef.current) {
@@ -178,13 +172,14 @@ export const SelectionOverlay: React.FC = () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [selectedNodeId, isRoot, updateOverlayPosition]);
+  }, [selectedNodeId, updateOverlayPosition]);
 
   // Handle pointer down on a resize handle
   const handleResizePointerDown = (
     direction: ResizeHandleDirection,
     e: React.PointerEvent<HTMLDivElement>
   ) => {
+    if (isRoot) return;
     e.preventDefault();
     e.stopPropagation();
 
@@ -280,12 +275,12 @@ export const SelectionOverlay: React.FC = () => {
     window.addEventListener("pointercancel", handlePointerUp);
   };
 
-  if (!selectedNodeId || !overlayRect || isRoot || !selectedNode) {
+  if (!selectedNodeId || !overlayRect || !selectedNode) {
     return null;
   }
 
   const tagName = selectedNode.type === "element" ? selectedNode.tag : "comp";
-  const displayName = selectedNode.name || tagName;
+  const displayName = isRoot ? "Page Root" : selectedNode.name || tagName;
 
   const isNudgeOrResize = isMoving || activeHandle !== null;
 

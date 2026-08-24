@@ -5,7 +5,8 @@
 // Recursive element renderer adhering to Phase 2 architecture:
 // - Granular subscription: each node subscribes to its own state.
 // - Resolves effective styles: base styles + breakpoint overrides.
-// - Dispatches by HTML tag with proper hierarchy.
+// - Dispatches by HTML tag with proper HTML rules & attribute support.
+// - Complies with HTML void tags (img, input, hr, br, source).
 // - Selection and visual focus integration.
 // ============================================================
 
@@ -99,26 +100,27 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
   };
 
   const tag = elementNode.tag || "div";
+  const attributes = (elementNode.attributes || {}) as Record<string, unknown>;
 
   // Common visual selection & hover outline classes
   const outlineClass = isRoot
-    ? ""
+    ? "relative w-full min-h-full cursor-default"
     : isSelected
     ? "relative z-10"
     : "relative hover:outline hover:outline-1 hover:outline-blue-400/40 cursor-pointer";
 
-  // 1. Image Elements
+  // 1. Image Elements (Void)
   if (tag === "img") {
-    const imgAttributes = elementNode.attributes as Record<string, unknown>;
     return (
       <img
         data-node-id={nodeId}
         data-tag={tag}
         src={
-          (imgAttributes?.src as string) ||
+          (attributes.src as string) ||
           "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=600&auto=format&fit=crop&q=80"
         }
-        alt={(imgAttributes?.alt as string) || elementNode.name || "Image"}
+        alt={(attributes.alt as string) || elementNode.name || "Image"}
+        loading={(attributes.loading as "lazy" | "eager") || "lazy"}
         style={effectiveStyles}
         onClick={handleClick}
         className={outlineClass}
@@ -126,17 +128,183 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
     );
   }
 
-  // 2. Button Elements
+  // 2. Video Elements
+  if (tag === "video") {
+    return (
+      <video
+        data-node-id={nodeId}
+        data-tag={tag}
+        src={
+          (attributes.src as string) ||
+          "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+        }
+        poster={(attributes.poster as string) || undefined}
+        controls={attributes.controls !== false}
+        autoPlay={Boolean(attributes.autoPlay)}
+        loop={Boolean(attributes.loop)}
+        muted={Boolean(attributes.muted)}
+        playsInline={attributes.playsInline !== false}
+        preload={(attributes.preload as "auto" | "metadata" | "none") || "metadata"}
+        style={effectiveStyles}
+        onClick={handleClick}
+        className={outlineClass}
+      />
+    );
+  }
+
+  // 3. Audio Elements
+  if (tag === "audio") {
+    return (
+      <audio
+        data-node-id={nodeId}
+        data-tag={tag}
+        src={(attributes.src as string) || undefined}
+        controls={attributes.controls !== false}
+        autoPlay={Boolean(attributes.autoPlay)}
+        loop={Boolean(attributes.loop)}
+        muted={Boolean(attributes.muted)}
+        preload={(attributes.preload as "auto" | "metadata" | "none") || "metadata"}
+        style={effectiveStyles}
+        onClick={handleClick}
+        className={outlineClass}
+      />
+    );
+  }
+
+  // 4. Iframe / Embed Elements
+  if (tag === "iframe") {
+    return (
+      <iframe
+        data-node-id={nodeId}
+        data-tag={tag}
+        src={(attributes.src as string) || "about:blank"}
+        title={(attributes.title as string) || "Embed frame"}
+        allowFullScreen={Boolean(attributes.allowFullScreen)}
+        loading={(attributes.loading as "lazy" | "eager") || "lazy"}
+        style={effectiveStyles}
+        onClick={handleClick}
+        className={`${outlineClass} border-0`}
+      />
+    );
+  }
+
+  // 5. Input Elements (Void)
+  if (tag === "input") {
+    return (
+      <input
+        data-node-id={nodeId}
+        data-tag={tag}
+        type={(attributes.type as string) || "text"}
+        placeholder={(attributes.placeholder as string) || undefined}
+        defaultValue={(attributes.value as string) || undefined}
+        disabled={Boolean(attributes.disabled)}
+        required={Boolean(attributes.required)}
+        readOnly={Boolean(attributes.readOnly)}
+        style={effectiveStyles}
+        onClick={handleClick}
+        className={outlineClass}
+      />
+    );
+  }
+
+  // 6. Textarea Elements
+  if (tag === "textarea") {
+    return (
+      <textarea
+        data-node-id={nodeId}
+        data-tag={tag}
+        placeholder={(attributes.placeholder as string) || undefined}
+        defaultValue={(attributes.value as string) || undefined}
+        rows={typeof attributes.rows === "number" ? attributes.rows : 3}
+        disabled={Boolean(attributes.disabled)}
+        required={Boolean(attributes.required)}
+        readOnly={Boolean(attributes.readOnly)}
+        style={effectiveStyles}
+        onClick={handleClick}
+        className={outlineClass}
+      />
+    );
+  }
+
+  // 7. Select Elements
+  if (tag === "select") {
+    return (
+      <select
+        data-node-id={nodeId}
+        data-tag={tag}
+        disabled={Boolean(attributes.disabled)}
+        multiple={Boolean(attributes.multiple)}
+        style={effectiveStyles}
+        onClick={handleClick}
+        className={outlineClass}
+      >
+        {elementNode.children.length > 0 ? (
+          elementNode.children.map((childId) => (
+            <ElementRenderer key={childId} nodeId={childId} />
+          ))
+        ) : (
+          <option>Option 1</option>
+        )}
+      </select>
+    );
+  }
+
+  // 8. Horizontal Rule / Break (Void)
+  if (tag === "hr") {
+    return (
+      <hr
+        data-node-id={nodeId}
+        data-tag={tag}
+        style={effectiveStyles}
+        onClick={handleClick}
+        className={outlineClass}
+      />
+    );
+  }
+  if (tag === "br") {
+    return <br data-node-id={nodeId} data-tag={tag} />;
+  }
+
+  // 9. Link Elements
+  if (tag === "a") {
+    const rawContent = (elementNode as unknown as { content?: string }).content;
+    const rawAttrText = attributes?.textContent as string | undefined;
+    const textContent = typeof rawContent === "string" ? rawContent : typeof rawAttrText === "string" ? rawAttrText : elementNode.name || "Link";
+
+    return (
+      <a
+        data-node-id={nodeId}
+        data-tag={tag}
+        href={(attributes.href as string) || "#"}
+        target={(attributes.target as string) || undefined}
+        rel={(attributes.rel as string) || undefined}
+        style={effectiveStyles}
+        onClick={handleClick}
+        className={outlineClass}
+      >
+        {elementNode.children.length > 0 ? (
+          elementNode.children.map((childId) => (
+            <ElementRenderer key={childId} nodeId={childId} />
+          ))
+        ) : (
+          textContent
+        )}
+      </a>
+    );
+  }
+
+  // 10. Button Elements
   if (tag === "button") {
     const rawContent = (elementNode as unknown as { content?: string }).content;
-    const rawAttrText = (elementNode.attributes as Record<string, unknown>)?.textContent;
+    const rawAttrText = attributes?.textContent as string | undefined;
     const textContent = typeof rawContent === "string" ? rawContent : typeof rawAttrText === "string" ? rawAttrText : elementNode.name || "Button";
 
     return (
       <button
         data-node-id={nodeId}
         data-tag={tag}
-        type="button"
+        type={(attributes.type as "button" | "submit" | "reset") || "button"}
+        disabled={Boolean(attributes.disabled)}
         style={effectiveStyles}
         onClick={handleClick}
         className={outlineClass}
@@ -152,7 +320,7 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
     );
   }
 
-  // 3. Text Elements (p, span, h1-h6, strong, em, etc.)
+  // 11. Text Elements (p, span, h1-h6, strong, em, etc.)
   const isTextTag = [
     "p",
     "span",
@@ -170,7 +338,7 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
 
   if (isTextTag) {
     const rawContent = (elementNode as unknown as { content?: string }).content;
-    const rawAttrText = (elementNode.attributes as Record<string, unknown>)?.textContent;
+    const rawAttrText = attributes?.textContent as string | undefined;
     const textContent = typeof rawContent === "string" ? rawContent : typeof rawAttrText === "string" ? rawAttrText : (elementNode.children.length === 0 ? elementNode.name || "" : "");
 
     const TextTag = tag as keyof React.JSX.IntrinsicElements;
@@ -194,7 +362,33 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
     );
   }
 
-  // 4. Container / Layout Elements (div, section, article, main, header, footer, etc.)
+  // 12. Form Elements
+  if (tag === "form") {
+    return (
+      <form
+        data-node-id={nodeId}
+        data-tag={tag}
+        action={(attributes.action as string) || undefined}
+        method={(attributes.method as string) || "post"}
+        style={effectiveStyles}
+        onClick={handleClick}
+        onSubmit={(e) => e.preventDefault()}
+        className={outlineClass}
+      >
+        {elementNode.children.length > 0 ? (
+          elementNode.children.map((childId) => (
+            <ElementRenderer key={childId} nodeId={childId} />
+          ))
+        ) : (
+          <div className="p-4 border border-dashed border-border rounded text-xs text-muted-foreground">
+            Empty Form Container
+          </div>
+        )}
+      </form>
+    );
+  }
+
+  // 13. Container / Layout Elements (div, section, article, main, header, footer, etc.)
   const ContainerTag = tag as keyof React.JSX.IntrinsicElements;
 
   // If Page Root is completely empty, show the starter canvas dropzone

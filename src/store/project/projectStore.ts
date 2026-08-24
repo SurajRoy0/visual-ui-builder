@@ -24,6 +24,10 @@ import {
     createViewportSlice,
 } from "./viewportSlice";
 
+import {
+    createStylesSlice,
+} from "./stylesSlice";
+
 import type { ProjectStoreState } from "./storeTypes";
 
 export const useProjectStore =
@@ -34,5 +38,6 @@ export const useProjectStore =
             ...createAnimationSlice(...args),
             ...createActionsSlice(...args),
             ...createViewportSlice(...args),
+            ...createStylesSlice(...args),
         })
     );
