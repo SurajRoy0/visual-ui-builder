@@ -29,6 +29,9 @@ import {
   Square,
   Circle,
   Link as LinkIcon,
+  Grid3x3,
+  Move3d,
+  Timer,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,13 +61,170 @@ import { useEditorStore } from "@/store/editor/editorStore";
 import { useProjectStore } from "@/store/project/projectStore";
 import { DEFAULT_PROJECT_STYLES } from "@/store/project/createInitialProject";
 import { isPageRoot } from "@/store/project/utils";
+import { isDefaultBreakpoint as computeIsDefaultBreakpoint, resolveActiveBreakpoint } from "@/store/project/selectors";
 import { resolveColorValue } from "@/lib/styleUtils";
 import { FontFamilyPicker } from "./controls/FontFamilyPicker";
 import { BoxShadowControl } from "./controls/BoxShadowControl";
 import type { ElementNode, ElementStyle, TypographyToken } from "@/types/project";
 
+/**
+ * Native color-swatch picker. React's onChange maps to the native `input`
+ * event, which fires continuously while the OS picker is open — so raw
+ * changes stay local and only commit on blur (the picker closing).
+ */
+function ColorSwatchInput({
+  displayHex,
+  fallbackHex,
+  onCommit,
+}: {
+  displayHex: string;
+  fallbackHex: string;
+  onCommit: (hex: string) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const swatchColor = draft ?? displayHex;
+  const inputValue = (draft ?? (displayHex.startsWith("#") ? displayHex : fallbackHex));
+
+  return (
+    <div className="relative size-8 rounded border border-border shrink-0 overflow-hidden shadow-xs">
+      <input
+        type="color"
+        value={inputValue}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          if (draft !== null) {
+            onCommit(draft);
+            setDraft(null);
+          }
+        }}
+        className="absolute inset-0 size-full opacity-0 cursor-pointer z-10"
+      />
+      <div className="size-full transition-colors" style={{ backgroundColor: swatchColor }} />
+    </div>
+  );
+}
+
+/** Hex/token text field paired with a color swatch — commits on blur/Enter. */
+function ColorHexInput({
+  rawVal,
+  fallbackHex,
+  onCommit,
+}: {
+  rawVal: string;
+  fallbackHex: string;
+  onCommit: (val: string) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const commit = () => {
+    if (draft !== null) {
+      onCommit(draft);
+      setDraft(null);
+    }
+  };
+
+  return (
+    <Input
+      value={draft ?? rawVal}
+      placeholder={fallbackHex}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          commit();
+          e.currentTarget.blur();
+        } else if (e.key === "Escape") {
+          setDraft(null);
+          e.currentTarget.blur();
+        }
+      }}
+      className="h-8 text-xs font-mono font-medium flex-1 rounded-md"
+    />
+  );
+}
+
+/** Text `<Input>` that commits on blur/Enter instead of every keystroke. */
+function DeferredInput({
+  value,
+  onCommit,
+  onKeyDown,
+  ...rest
+}: {
+  value: string;
+  onCommit: (val: string) => void;
+} & Omit<React.ComponentProps<"input">, "value" | "onChange" | "onBlur">) {
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const commit = () => {
+    if (draft !== null) {
+      onCommit(draft);
+      setDraft(null);
+    }
+  };
+
+  return (
+    <Input
+      {...rest}
+      value={draft ?? value}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        onKeyDown?.(e);
+        if (e.defaultPrevented) return;
+        if (e.key === "Enter") {
+          commit();
+          e.currentTarget.blur();
+        } else if (e.key === "Escape") {
+          setDraft(null);
+          e.currentTarget.blur();
+        }
+      }}
+    />
+  );
+}
+
+/** Multi-line `<Textarea>` that commits on blur (Enter inserts a newline as usual). */
+function DeferredTextarea({
+  value,
+  onCommit,
+  onKeyDown,
+  ...rest
+}: {
+  value: string;
+  onCommit: (val: string) => void;
+} & Omit<React.ComponentProps<"textarea">, "value" | "onChange" | "onBlur">) {
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const commit = () => {
+    if (draft !== null) {
+      onCommit(draft);
+      setDraft(null);
+    }
+  };
+
+  return (
+    <Textarea
+      {...rest}
+      value={draft ?? value}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        onKeyDown?.(e);
+        if (e.defaultPrevented) return;
+        if (e.key === "Escape") {
+          setDraft(null);
+          e.currentTarget.blur();
+        }
+      }}
+    />
+  );
+}
+
 export const SelectedElementInspector: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  // Live-preview-only draft for the opacity slider — commits to the store
+  // on release/blur, not on every drag tick (Section 15 high-frequency rule).
+  const [opacityDraft, setOpacityDraft] = useState<number | null>(null);
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
   const activeBreakpointId = useEditorStore((state) => state.activeBreakpointId);
   const activePageId = useEditorStore((state) => state.activePageId);
@@ -83,10 +243,9 @@ export const SelectedElementInspector: React.FC = () => {
   const selectedNode = useProjectStore((state) => state.project.elements[targetNodeId]);
 
   // 3. Resolve Active Breakpoint
-  const activeBreakpoint = useProjectStore((state) => {
-    const bp = state.project.breakpoints.find((b) => b.id === activeBreakpointId);
-    return bp || state.project.breakpoints[0] || { id: "bp-desktop", name: "Desktop", minWidth: 1200, isDefault: true };
-  });
+  const activeBreakpoint = useProjectStore((state) =>
+    resolveActiveBreakpoint(state.project.breakpoints, activeBreakpointId)
+  );
 
   const projectStyles = useProjectStore((state) => state.project.styles) || DEFAULT_PROJECT_STYLES;
   
@@ -135,7 +294,7 @@ export const SelectedElementInspector: React.FC = () => {
   const elementName = isRoot ? "Page Root" : (element.name || element.tag || "Element");
   const elementTag = element.tag || "div";
 
-  const isDefaultBreakpoint = activeBreakpoint.isDefault ?? (activeBreakpoint.minWidth >= 1200);
+  const isDefaultBreakpoint = computeIsDefaultBreakpoint(activeBreakpoint);
 
   const attributes = (element.attributes || {}) as Record<string, unknown>;
   const textContent =
@@ -163,6 +322,7 @@ export const SelectedElementInspector: React.FC = () => {
   const typographyTokens = projectStyles.typography || {};
   const radiusTokens = projectStyles.radii || {};
   const shadowTokens = projectStyles.shadows || {};
+  const spacingTokens = projectStyles.spacing || {};
   const fontTokens = projectStyles.fonts || {};
 
   const handleStyleChange = (patch: Partial<ElementStyle>) => {
@@ -177,12 +337,15 @@ export const SelectedElementInspector: React.FC = () => {
     const token: TypographyToken | undefined = typographyTokens[presetKey];
     if (!token) return;
 
+    // Reference the token's CSS vars rather than baking in a snapshot of
+    // its current values — editing the preset later then keeps propagating
+    // to every node that applied it (same as color/radius tokens).
     handleStyleChange({
-      fontFamily: token.fontFamily,
-      fontSize: token.fontSize,
-      fontWeight: token.fontWeight ? String(token.fontWeight) : undefined,
-      lineHeight: token.lineHeight,
-      letterSpacing: token.letterSpacing,
+      fontFamily: token.fontFamily !== undefined ? `var(--typography-${presetKey}-font-family)` : undefined,
+      fontSize: token.fontSize !== undefined ? `var(--typography-${presetKey}-font-size)` : undefined,
+      fontWeight: token.fontWeight !== undefined ? `var(--typography-${presetKey}-font-weight)` : undefined,
+      lineHeight: token.lineHeight !== undefined ? `var(--typography-${presetKey}-line-height)` : undefined,
+      letterSpacing: token.letterSpacing !== undefined ? `var(--typography-${presetKey}-letter-spacing)` : undefined,
     });
   };
 
@@ -271,24 +434,16 @@ export const SelectedElementInspector: React.FC = () => {
 
         <div className="flex items-center gap-1.5">
           {/* Color swatch & native picker */}
-          <div className="relative size-8 rounded border border-border shrink-0 overflow-hidden shadow-xs">
-            <input
-              type="color"
-              value={displayHex.startsWith("#") ? displayHex : fallbackHex}
-              onChange={(e) => handleStyleChange({ [propertyKey]: e.target.value })}
-              className="absolute inset-0 size-full opacity-0 cursor-pointer z-10"
-            />
-            <div
-              className="size-full transition-colors"
-              style={{ backgroundColor: displayHex }}
-            />
-          </div>
+          <ColorSwatchInput
+            displayHex={displayHex}
+            fallbackHex={fallbackHex}
+            onCommit={(hex) => handleStyleChange({ [propertyKey]: hex })}
+          />
 
-          <Input
-            value={rawVal}
-            placeholder={fallbackHex}
-            onChange={(e) => handleStyleChange({ [propertyKey]: e.target.value })}
-            className="h-8 text-xs font-mono font-medium flex-1 rounded-md"
+          <ColorHexInput
+            rawVal={rawVal}
+            fallbackHex={fallbackHex}
+            onCommit={(val) => handleStyleChange({ [propertyKey]: val })}
           />
 
           {/* Project Color Tokens Popover */}
@@ -499,7 +654,10 @@ export const SelectedElementInspector: React.FC = () => {
                   <Label className="text-xs font-medium text-muted-foreground">Z-Index</Label>
                   <UnitInput
                     value={effectiveStyle.zIndex !== undefined ? String(effectiveStyle.zIndex) : "auto"}
-                    onChange={(val) => handleStyleChange({ zIndex: val === "auto" || val === "" ? undefined : parseInt(val, 10) || 0 })}
+                    onChange={(val) => {
+                      const parsed = val === "auto" || val === "" ? NaN : parseInt(val, 10);
+                      handleStyleChange({ zIndex: Number.isNaN(parsed) ? undefined : parsed });
+                    }}
                     placeholder="auto"
                     className="h-8"
                   />
@@ -691,6 +849,149 @@ export const SelectedElementInspector: React.FC = () => {
             </AccordionItem>
           )}
 
+        {/* ==================== 2B. GRID & PLACEMENT ==================== */}
+        {effectiveStyle.display === "grid" &&
+          matchesFilter("grid", "template", "columns", "rows", "area", "placement") && (
+            <AccordionItem value="grid" className="border-b border-border/50">
+              <AccordionTrigger className="px-3.5 py-2.5 hover:no-underline hover:bg-secondary/20">
+                <div className="flex items-center gap-2 text-xs font-semibold">
+                  <Grid3x3 className="size-3.5 text-sky-500" />
+                  <span>Grid & Placement</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-3.5 pt-1 pb-3 space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Template Columns</Label>
+                  <DeferredInput
+                    value={effectiveStyle.gridTemplateColumns || ""}
+                    onCommit={(val) => handleStyleChange({ gridTemplateColumns: val })}
+                    placeholder="1fr 1fr 1fr / repeat(3, 1fr)"
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Template Rows</Label>
+                  <DeferredInput
+                    value={effectiveStyle.gridTemplateRows || ""}
+                    onCommit={(val) => handleStyleChange({ gridTemplateRows: val })}
+                    placeholder="auto 1fr auto"
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Template Areas</Label>
+                  <DeferredInput
+                    value={effectiveStyle.gridTemplateAreas || ""}
+                    onCommit={(val) => handleStyleChange({ gridTemplateAreas: val })}
+                    placeholder='"header header" "nav main"'
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Auto Flow</Label>
+                    <Select
+                      value={effectiveStyle.gridAutoFlow || "row"}
+                      onValueChange={(val) => val && handleStyleChange({ gridAutoFlow: val as ElementStyle["gridAutoFlow"] })}
+                    >
+                      <SelectTrigger className="h-8 text-xs font-medium">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="row">Row</SelectItem>
+                        <SelectItem value="column">Column</SelectItem>
+                        <SelectItem value="row dense">Row Dense</SelectItem>
+                        <SelectItem value="column dense">Column Dense</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Gap (Spacing)</Label>
+                    <UnitInput
+                      value={effectiveStyle.gap !== undefined ? String(effectiveStyle.gap) : "0px"}
+                      onChange={(val) => handleStyleChange({ gap: val })}
+                      className="h-8"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Auto Rows</Label>
+                    <DeferredInput
+                      value={effectiveStyle.gridAutoRows || ""}
+                      onCommit={(val) => handleStyleChange({ gridAutoRows: val })}
+                      placeholder="minmax(100px, auto)"
+                      className="h-8 text-xs font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Auto Columns</Label>
+                    <DeferredInput
+                      value={effectiveStyle.gridAutoColumns || ""}
+                      onCommit={(val) => handleStyleChange({ gridAutoColumns: val })}
+                      placeholder="minmax(100px, auto)"
+                      className="h-8 text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Item: Column</Label>
+                    <DeferredInput
+                      value={effectiveStyle.gridColumn || ""}
+                      onCommit={(val) => handleStyleChange({ gridColumn: val })}
+                      placeholder="1 / 3"
+                      className="h-8 text-xs font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Item: Row</Label>
+                    <DeferredInput
+                      value={effectiveStyle.gridRow || ""}
+                      onCommit={(val) => handleStyleChange({ gridRow: val })}
+                      placeholder="1 / 2"
+                      className="h-8 text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Item: Area</Label>
+                  <DeferredInput
+                    value={effectiveStyle.gridArea || ""}
+                    onCommit={(val) => handleStyleChange({ gridArea: val })}
+                    placeholder="header"
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Place Items</Label>
+                    <DeferredInput
+                      value={effectiveStyle.placeItems || ""}
+                      onCommit={(val) => handleStyleChange({ placeItems: val })}
+                      placeholder="center stretch"
+                      className="h-8 text-xs font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-muted-foreground">Place Content</Label>
+                    <DeferredInput
+                      value={effectiveStyle.placeContent || ""}
+                      onCommit={(val) => handleStyleChange({ placeContent: val })}
+                      placeholder="center stretch"
+                      className="h-8 text-xs font-mono"
+                    />
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          )}
+
         {/* ==================== 3. PADDING & MARGIN (SPACING) ==================== */}
         {matchesFilter("spacing", "padding", "margin", "inset") && (
           <AccordionItem value="spacing" className="border-b border-border/50">
@@ -703,7 +1004,32 @@ export const SelectedElementInspector: React.FC = () => {
             <AccordionContent className="px-3.5 pt-1 pb-3 space-y-3">
               {/* Padding */}
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-muted-foreground">Padding (Inner)</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-medium text-muted-foreground">Padding (Inner)</Label>
+                  {Object.keys(spacingTokens).length > 0 && (
+                    <Popover>
+                      <PopoverTrigger className="text-[10px] text-emerald-500 hover:underline font-mono px-1 rounded cursor-pointer">
+                        Tokens ({Object.keys(spacingTokens).length})
+                      </PopoverTrigger>
+                      <PopoverContent className="w-48 p-2 space-y-1 bg-popover border-border shadow-xl z-50" align="end">
+                        <div className="text-[11px] font-semibold text-foreground px-1 pb-1 border-b border-border">
+                          Spacing Tokens
+                        </div>
+                        {Object.entries(spacingTokens).map(([name, val]) => (
+                          <button
+                            key={name}
+                            type="button"
+                            onClick={() => handleStyleChange({ padding: `var(--spacing-${name})` })}
+                            className="w-full flex items-center justify-between p-1 rounded hover:bg-secondary text-xs cursor-pointer text-left"
+                          >
+                            <span className="font-medium text-foreground">{name}</span>
+                            <span className="text-[10px] font-mono text-muted-foreground">{String(val)}</span>
+                          </button>
+                        ))}
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <UnitInput
                     value={effectiveStyle.padding !== undefined ? String(effectiveStyle.padding) : "0px"}
@@ -737,7 +1063,32 @@ export const SelectedElementInspector: React.FC = () => {
               {/* Margin */}
               {!isRoot && (
                 <div className="space-y-1.5 pt-1 border-t border-border/50">
-                  <Label className="text-xs font-medium text-muted-foreground">Margin (Outer)</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium text-muted-foreground">Margin (Outer)</Label>
+                    {Object.keys(spacingTokens).length > 0 && (
+                      <Popover>
+                        <PopoverTrigger className="text-[10px] text-emerald-500 hover:underline font-mono px-1 rounded cursor-pointer">
+                          Tokens ({Object.keys(spacingTokens).length})
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48 p-2 space-y-1 bg-popover border-border shadow-xl z-50" align="end">
+                          <div className="text-[11px] font-semibold text-foreground px-1 pb-1 border-b border-border">
+                            Spacing Tokens
+                          </div>
+                          {Object.entries(spacingTokens).map(([name, val]) => (
+                            <button
+                              key={name}
+                              type="button"
+                              onClick={() => handleStyleChange({ margin: `var(--spacing-${name})` })}
+                              className="w-full flex items-center justify-between p-1 rounded hover:bg-secondary text-xs cursor-pointer text-left"
+                            >
+                              <span className="font-medium text-foreground">{name}</span>
+                              <span className="text-[10px] font-mono text-muted-foreground">{String(val)}</span>
+                            </button>
+                          ))}
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <UnitInput
                       value={effectiveStyle.margin !== undefined ? String(effectiveStyle.margin) : "0px"}
@@ -788,10 +1139,10 @@ export const SelectedElementInspector: React.FC = () => {
               {!isRoot && (isTextElement || isButtonElement || element.children.length === 0) && (
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground">Text Content</Label>
-                  <Textarea
+                  <DeferredTextarea
                     rows={2}
                     value={textContent}
-                    onChange={(e) => handleTextChange(e.target.value)}
+                    onCommit={handleTextChange}
                     placeholder="Enter element text..."
                     className="text-xs font-normal rounded-md"
                   />
@@ -955,9 +1306,9 @@ export const SelectedElementInspector: React.FC = () => {
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground">Line Height</Label>
-                  <Input
+                  <DeferredInput
                     value={effectiveStyle.lineHeight !== undefined ? String(effectiveStyle.lineHeight) : "1.5"}
-                    onChange={(e) => handleStyleChange({ lineHeight: e.target.value })}
+                    onCommit={(val) => handleStyleChange({ lineHeight: val })}
                     placeholder="1.5 / 24px"
                     className="h-8 text-xs"
                   />
@@ -1019,9 +1370,9 @@ export const SelectedElementInspector: React.FC = () => {
               {/* Background Image & Settings */}
               <div className="space-y-1.5 pt-1 border-t border-border/50">
                 <Label className="text-xs font-medium text-muted-foreground">Background Image (URL)</Label>
-                <Input
+                <DeferredInput
                   value={effectiveStyle.backgroundImage || ""}
-                  onChange={(e) => handleStyleChange({ backgroundImage: e.target.value })}
+                  onCommit={(val) => handleStyleChange({ backgroundImage: val })}
                   placeholder="url('https://...')"
                   className="h-8 text-xs font-mono"
                 />
@@ -1187,6 +1538,240 @@ export const SelectedElementInspector: React.FC = () => {
             </AccordionItem>
           )}
 
+        {/* ==================== 6B. TRANSFORM ==================== */}
+        {matchesFilter("transform", "translate", "rotate", "scale", "skew", "perspective", "origin") && (
+          <AccordionItem value="transform" className="border-b border-border/50">
+            <AccordionTrigger className="px-3.5 py-2.5 hover:no-underline hover:bg-secondary/20">
+              <div className="flex items-center gap-2 text-xs font-semibold">
+                <Move3d className="size-3.5 text-indigo-400" />
+                <span>Transform</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-3.5 pt-1 pb-3 space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Translate X</Label>
+                  <UnitInput
+                    value={effectiveStyle.translateX !== undefined ? String(effectiveStyle.translateX) : "0px"}
+                    onChange={(val) => handleStyleChange({ translateX: val })}
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Translate Y</Label>
+                  <UnitInput
+                    value={effectiveStyle.translateY !== undefined ? String(effectiveStyle.translateY) : "0px"}
+                    onChange={(val) => handleStyleChange({ translateY: val })}
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Translate Z</Label>
+                  <UnitInput
+                    value={effectiveStyle.translateZ !== undefined ? String(effectiveStyle.translateZ) : "0px"}
+                    onChange={(val) => handleStyleChange({ translateZ: val })}
+                    className="h-8"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Rotate</Label>
+                  <UnitInput
+                    value={effectiveStyle.rotate !== undefined ? String(effectiveStyle.rotate) : "0deg"}
+                    unit="deg"
+                    units={["deg"]}
+                    onChange={(val) => handleStyleChange({ rotate: val })}
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Rotate X</Label>
+                  <UnitInput
+                    value={effectiveStyle.rotateX !== undefined ? String(effectiveStyle.rotateX) : "0deg"}
+                    unit="deg"
+                    units={["deg"]}
+                    onChange={(val) => handleStyleChange({ rotateX: val })}
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Rotate Y</Label>
+                  <UnitInput
+                    value={effectiveStyle.rotateY !== undefined ? String(effectiveStyle.rotateY) : "0deg"}
+                    unit="deg"
+                    units={["deg"]}
+                    onChange={(val) => handleStyleChange({ rotateY: val })}
+                    className="h-8"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Scale</Label>
+                  <DeferredInput
+                    value={effectiveStyle.scale !== undefined ? String(effectiveStyle.scale) : "1"}
+                    onCommit={(val) => handleStyleChange({ scale: parseFloat(val) || 1 })}
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Scale X</Label>
+                  <DeferredInput
+                    value={effectiveStyle.scaleX !== undefined ? String(effectiveStyle.scaleX) : "1"}
+                    onCommit={(val) => handleStyleChange({ scaleX: parseFloat(val) || 1 })}
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Scale Y</Label>
+                  <DeferredInput
+                    value={effectiveStyle.scaleY !== undefined ? String(effectiveStyle.scaleY) : "1"}
+                    onCommit={(val) => handleStyleChange({ scaleY: parseFloat(val) || 1 })}
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Skew X</Label>
+                  <UnitInput
+                    value={effectiveStyle.skewX !== undefined ? String(effectiveStyle.skewX) : "0deg"}
+                    unit="deg"
+                    units={["deg"]}
+                    onChange={(val) => handleStyleChange({ skewX: val })}
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Skew Y</Label>
+                  <UnitInput
+                    value={effectiveStyle.skewY !== undefined ? String(effectiveStyle.skewY) : "0deg"}
+                    unit="deg"
+                    units={["deg"]}
+                    onChange={(val) => handleStyleChange({ skewY: val })}
+                    className="h-8"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Transform Origin</Label>
+                  <DeferredInput
+                    value={effectiveStyle.transformOrigin || ""}
+                    onCommit={(val) => handleStyleChange({ transformOrigin: val })}
+                    placeholder="center / 0% 0%"
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Perspective</Label>
+                  <UnitInput
+                    value={effectiveStyle.perspective !== undefined ? String(effectiveStyle.perspective) : "none"}
+                    units={["px", "none"]}
+                    onChange={(val) => handleStyleChange({ perspective: val })}
+                    className="h-8"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1 border-t border-border/50">
+                <span className="text-xs text-foreground font-medium">Backface Visibility</span>
+                <Tabs
+                  value={effectiveStyle.backfaceVisibility || "visible"}
+                  onValueChange={(val) => val && handleStyleChange({ backfaceVisibility: val as ElementStyle["backfaceVisibility"] })}
+                >
+                  <TabsList className="h-7 bg-secondary/80 p-0.5 rounded-md">
+                    <TabsTrigger value="visible" className="text-[10px] h-6 px-2">
+                      Visible
+                    </TabsTrigger>
+                    <TabsTrigger value="hidden" className="text-[10px] h-6 px-2">
+                      Hidden
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+
+              <div className="space-y-1.5 pt-1 border-t border-border/50">
+                <Label className="text-xs font-medium text-muted-foreground">Raw Transform (advanced override)</Label>
+                <DeferredInput
+                  value={effectiveStyle.transformRaw || ""}
+                  onCommit={(val) => handleStyleChange({ transformRaw: val || undefined })}
+                  placeholder="matrix3d(...) — overrides the fields above"
+                  className="h-8 text-xs font-mono"
+                />
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        )}
+
+        {/* ==================== 6C. TRANSITION ==================== */}
+        {matchesFilter("transition", "duration", "easing", "delay", "animate") && (
+          <AccordionItem value="transition" className="border-b border-border/50">
+            <AccordionTrigger className="px-3.5 py-2.5 hover:no-underline hover:bg-secondary/20">
+              <div className="flex items-center gap-2 text-xs font-semibold">
+                <Timer className="size-3.5 text-emerald-400" />
+                <span>Transition</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-3.5 pt-1 pb-3 space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">Property</Label>
+                <DeferredInput
+                  value={effectiveStyle.transitionProperty || ""}
+                  onCommit={(val) => handleStyleChange({ transitionProperty: val })}
+                  placeholder="all / opacity, transform"
+                  className="h-8 text-xs font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Duration</Label>
+                  <DeferredInput
+                    value={effectiveStyle.transitionDuration !== undefined ? String(effectiveStyle.transitionDuration) : "0s"}
+                    onCommit={(val) => handleStyleChange({ transitionDuration: val })}
+                    placeholder="300ms / 0.3s"
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Delay</Label>
+                  <DeferredInput
+                    value={effectiveStyle.transitionDelay !== undefined ? String(effectiveStyle.transitionDelay) : "0s"}
+                    onCommit={(val) => handleStyleChange({ transitionDelay: val })}
+                    placeholder="0ms / 0s"
+                    className="h-8 text-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-muted-foreground">Timing Function</Label>
+                <Select
+                  value={effectiveStyle.transitionTimingFunction || "ease"}
+                  onValueChange={(val) => val && handleStyleChange({ transitionTimingFunction: val })}
+                >
+                  <SelectTrigger className="h-8 text-xs font-medium">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="linear">Linear</SelectItem>
+                    <SelectItem value="ease">Ease</SelectItem>
+                    <SelectItem value="ease-in">Ease In</SelectItem>
+                    <SelectItem value="ease-out">Ease Out</SelectItem>
+                    <SelectItem value="ease-in-out">Ease In Out</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        )}
+
         {/* ==================== 7. EFFECTS & SHADOWS ==================== */}
         {matchesFilter("effect", "shadow", "opacity", "blur", "backdrop", "filter") && (
           <AccordionItem value="effects" className="border-b border-border/50">
@@ -1210,7 +1795,7 @@ export const SelectedElementInspector: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <Label className="text-xs font-medium text-muted-foreground">Opacity</Label>
                   <span className="text-[11px] font-mono text-muted-foreground">
-                    {Math.round((effectiveStyle.opacity ?? 1) * 100)}%
+                    {Math.round((opacityDraft ?? effectiveStyle.opacity ?? 1) * 100)}%
                   </span>
                 </div>
                 <Input
@@ -1218,8 +1803,26 @@ export const SelectedElementInspector: React.FC = () => {
                   min="0"
                   max="1"
                   step="0.05"
-                  value={effectiveStyle.opacity !== undefined ? effectiveStyle.opacity : 1}
-                  onChange={(e) => handleStyleChange({ opacity: parseFloat(e.target.value) })}
+                  value={opacityDraft ?? (effectiveStyle.opacity !== undefined ? effectiveStyle.opacity : 1)}
+                  onChange={(e) => setOpacityDraft(parseFloat(e.target.value))}
+                  onPointerUp={() => {
+                    if (opacityDraft !== null) {
+                      handleStyleChange({ opacity: opacityDraft });
+                      setOpacityDraft(null);
+                    }
+                  }}
+                  onKeyUp={() => {
+                    if (opacityDraft !== null) {
+                      handleStyleChange({ opacity: opacityDraft });
+                      setOpacityDraft(null);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (opacityDraft !== null) {
+                      handleStyleChange({ opacity: opacityDraft });
+                      setOpacityDraft(null);
+                    }
+                  }}
                   className="h-6 cursor-pointer"
                 />
               </div>
@@ -1236,9 +1839,9 @@ export const SelectedElementInspector: React.FC = () => {
                     Preset Glass
                   </button>
                 </div>
-                <Input
+                <DeferredInput
                   value={effectiveStyle.backdropFilter || ""}
-                  onChange={(e) => handleStyleChange({ backdropFilter: e.target.value })}
+                  onCommit={(val) => handleStyleChange({ backdropFilter: val })}
                   placeholder="blur(16px) / saturate(180%)"
                   className="h-8 text-xs font-mono"
                 />
@@ -1280,9 +1883,9 @@ export const SelectedElementInspector: React.FC = () => {
                         Sample Video
                       </button>
                     </div>
-                    <Input
+                    <DeferredInput
                       value={(attributes.src as string) || ""}
-                      onChange={(e) => handleAttributeChange({ src: e.target.value })}
+                      onCommit={(val) => handleAttributeChange({ src: val })}
                       placeholder="https://...mp4"
                       className="h-7 text-xs font-mono"
                     />
@@ -1290,9 +1893,9 @@ export const SelectedElementInspector: React.FC = () => {
 
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">Poster Image URL</Label>
-                    <Input
+                    <DeferredInput
                       value={(attributes.poster as string) || ""}
-                      onChange={(e) => handleAttributeChange({ poster: e.target.value })}
+                      onCommit={(val) => handleAttributeChange({ poster: val })}
                       placeholder="https://...jpg"
                       className="h-7 text-xs font-mono"
                     />
@@ -1361,9 +1964,9 @@ export const SelectedElementInspector: React.FC = () => {
                         Sample Audio
                       </button>
                     </div>
-                    <Input
+                    <DeferredInput
                       value={(attributes.src as string) || ""}
-                      onChange={(e) => handleAttributeChange({ src: e.target.value })}
+                      onCommit={(val) => handleAttributeChange({ src: val })}
                       placeholder="https://...mp3"
                       className="h-7 text-xs font-mono"
                     />
@@ -1405,9 +2008,9 @@ export const SelectedElementInspector: React.FC = () => {
 
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">Embed URL (src)</Label>
-                    <Input
+                    <DeferredInput
                       value={(attributes.src as string) || ""}
-                      onChange={(e) => handleAttributeChange({ src: e.target.value })}
+                      onCommit={(val) => handleAttributeChange({ src: val })}
                       placeholder="https://..."
                       className="h-7 text-xs font-mono"
                     />
@@ -1415,9 +2018,9 @@ export const SelectedElementInspector: React.FC = () => {
 
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">Frame Title</Label>
-                    <Input
+                    <DeferredInput
                       value={(attributes.title as string) || ""}
-                      onChange={(e) => handleAttributeChange({ title: e.target.value })}
+                      onCommit={(val) => handleAttributeChange({ title: val })}
                       placeholder="Embedded Content"
                       className="h-7 text-xs"
                     />
@@ -1451,9 +2054,9 @@ export const SelectedElementInspector: React.FC = () => {
                         Unsplash Art
                       </button>
                     </div>
-                    <Input
+                    <DeferredInput
                       value={(attributes.src as string) || ""}
-                      onChange={(e) => handleAttributeChange({ src: e.target.value })}
+                      onCommit={(val) => handleAttributeChange({ src: val })}
                       placeholder="https://..."
                       className="h-7 text-xs font-mono"
                     />
@@ -1461,9 +2064,9 @@ export const SelectedElementInspector: React.FC = () => {
 
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">Alt Text (Accessibility & SEO)</Label>
-                    <Input
+                    <DeferredInput
                       value={(attributes.alt as string) || ""}
-                      onChange={(e) => handleAttributeChange({ alt: e.target.value })}
+                      onCommit={(val) => handleAttributeChange({ alt: val })}
                       placeholder="Descriptive image summary"
                       className="h-7 text-xs"
                     />
@@ -1505,9 +2108,9 @@ export const SelectedElementInspector: React.FC = () => {
 
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">Destination URL (href)</Label>
-                    <Input
+                    <DeferredInput
                       value={(attributes.href as string) || "#"}
-                      onChange={(e) => handleAttributeChange({ href: e.target.value })}
+                      onCommit={(val) => handleAttributeChange({ href: val })}
                       placeholder="https://..."
                       className="h-7 text-xs font-mono"
                     />
@@ -1590,9 +2193,9 @@ export const SelectedElementInspector: React.FC = () => {
 
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">Placeholder Text</Label>
-                    <Input
+                    <DeferredInput
                       value={(attributes.placeholder as string) || ""}
-                      onChange={(e) => handleAttributeChange({ placeholder: e.target.value })}
+                      onCommit={(val) => handleAttributeChange({ placeholder: val })}
                       placeholder="e.g. Enter your name..."
                       className="h-7 text-xs"
                     />
@@ -1629,9 +2232,9 @@ export const SelectedElementInspector: React.FC = () => {
                 <div className="space-y-2.5 p-2.5 rounded-lg bg-secondary/30 border border-border">
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">Placeholder Text</Label>
-                    <Input
+                    <DeferredInput
                       value={(attributes.placeholder as string) || ""}
-                      onChange={(e) => handleAttributeChange({ placeholder: e.target.value })}
+                      onCommit={(val) => handleAttributeChange({ placeholder: val })}
                       placeholder="e.g. Type your message..."
                       className="h-7 text-xs"
                     />
@@ -1639,12 +2242,12 @@ export const SelectedElementInspector: React.FC = () => {
 
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">Visible Rows</Label>
-                    <Input
+                    <DeferredInput
                       type="number"
                       min={1}
                       max={20}
-                      value={typeof attributes.rows === "number" ? attributes.rows : 3}
-                      onChange={(e) => handleAttributeChange({ rows: parseInt(e.target.value) || 3 })}
+                      value={String(typeof attributes.rows === "number" ? attributes.rows : 3)}
+                      onCommit={(val) => handleAttributeChange({ rows: parseInt(val, 10) || 3 })}
                       className="h-7 text-xs"
                     />
                   </div>
@@ -1695,9 +2298,9 @@ export const SelectedElementInspector: React.FC = () => {
                 <div className="space-y-2.5 p-2.5 rounded-lg bg-secondary/30 border border-border">
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">Form Action (URL)</Label>
-                    <Input
+                    <DeferredInput
                       value={(attributes.action as string) || ""}
-                      onChange={(e) => handleAttributeChange({ action: e.target.value })}
+                      onCommit={(val) => handleAttributeChange({ action: val })}
                       placeholder="/api/contact"
                       className="h-7 text-xs font-mono"
                     />
@@ -1726,9 +2329,9 @@ export const SelectedElementInspector: React.FC = () => {
               <div className="space-y-2 pt-2 border-t border-border/50">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground">HTML ID</Label>
-                  <Input
+                  <DeferredInput
                     value={(attributes.id as string) || ""}
-                    onChange={(e) => handleAttributeChange({ id: e.target.value })}
+                    onCommit={(val) => handleAttributeChange({ id: val })}
                     placeholder="e.g. hero-section"
                     className="h-8 text-xs font-mono"
                   />
@@ -1736,9 +2339,9 @@ export const SelectedElementInspector: React.FC = () => {
 
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground">Custom CSS Classes</Label>
-                  <Input
+                  <DeferredInput
                     value={(attributes.className as string) || ""}
-                    onChange={(e) => handleAttributeChange({ className: e.target.value })}
+                    onCommit={(val) => handleAttributeChange({ className: val })}
                     placeholder="e.g. glass-card shadow-lg"
                     className="h-8 text-xs font-mono"
                   />
@@ -1746,9 +2349,9 @@ export const SelectedElementInspector: React.FC = () => {
 
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-muted-foreground">Aria Label (Accessibility)</Label>
-                  <Input
+                  <DeferredInput
                     value={(attributes["aria-label"] as string) || ""}
-                    onChange={(e) => handleAttributeChange({ "aria-label": e.target.value })}
+                    onCommit={(val) => handleAttributeChange({ "aria-label": val })}
                     placeholder="Accessible label description"
                     className="h-8 text-xs"
                   />

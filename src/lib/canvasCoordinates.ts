@@ -44,6 +44,17 @@ export function screenToCanvasDocument(
 }
 
 /**
+ * Converts a screen-space delta (e.g. a pointermove distance in raw
+ * client pixels) into document-space, accounting for zoom. The scalar
+ * counterpart to screenToCanvasDocument's point conversion — for drags
+ * that only need "how far did the pointer move," not a full position.
+ */
+export function screenDeltaToDocumentDelta(screenDelta: number, zoom: number): number {
+  const safeZoom = Math.max(0.01, zoom || 1);
+  return screenDelta / safeZoom;
+}
+
+/**
  * Checks if a point is within a given rectangle.
  */
 export function isPointInsideRect(point: Point, rect: Rect): boolean {
@@ -60,8 +71,8 @@ export function isPointInsideRect(point: Point, rect: Rect): boolean {
  * relative to the canvas container origin.
  */
 export function getRelativeElementRect(
-  elementRect: DOMRect,
-  canvasContainerRect: DOMRect,
+  elementRect: DOMRect | Rect,
+  canvasContainerRect: DOMRect | Rect,
   zoom: number
 ): Rect {
   const safeZoom = Math.max(0.01, zoom || 1);

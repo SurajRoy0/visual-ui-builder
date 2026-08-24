@@ -303,12 +303,68 @@ export const createElementsSlice: StateCreator<
             }
 
             /**
-             * Clean up any timeline tracks targeting the deleted elements.
+             * Clean up any timeline tracks / scroll-trigger references
+             * targeting the deleted elements.
              */
             for (const timeline of Object.values(draft.gsapTimelines)) {
                 timeline.tracks = timeline.tracks.filter(
                     (track) => !deletedIdsSet.has(track.targetNodeId)
                 );
+
+                if (
+                    timeline.scrollTrigger?.triggerNodeId &&
+                    deletedIdsSet.has(
+                        timeline.scrollTrigger.triggerNodeId
+                    )
+                ) {
+                    delete timeline.scrollTrigger.triggerNodeId;
+                }
+            }
+
+            /**
+             * Delete any actions that targeted the deleted elements,
+             * then sweep bindings pointing at those now-deleted actions
+             * (same pattern as removeAction).
+             */
+            const orphanedActionIds = new Set<string>();
+
+            for (const action of Object.values(draft.actions)) {
+                let targetNodeId: string | undefined;
+
+                switch (action.type) {
+                    case "scrollTo":
+                    case "toggle":
+                    case "openModal":
+                    case "closeModal":
+                        targetNodeId = action.config.targetNodeId;
+                        break;
+                    case "submitForm":
+                        targetNodeId = action.config.formNodeId;
+                        break;
+                    default:
+                        targetNodeId = undefined;
+                }
+
+                if (targetNodeId && deletedIdsSet.has(targetNodeId)) {
+                    orphanedActionIds.add(action.id);
+                    delete draft.actions[action.id];
+                }
+            }
+
+            if (orphanedActionIds.size > 0) {
+                for (const otherNode of Object.values(draft.elements)) {
+                    if (
+                        otherNode.type !== "element" ||
+                        !otherNode.actions
+                    ) {
+                        continue;
+                    }
+
+                    otherNode.actions = otherNode.actions.filter(
+                        (binding) =>
+                            !orphanedActionIds.has(binding.actionId)
+                    );
+                }
             }
         });
     },

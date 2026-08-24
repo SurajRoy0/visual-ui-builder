@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Square,
   Type,
@@ -30,7 +30,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { useProjectStore } from "@/store/project";
 import { useEditorStore } from "@/store/editor";
 import type { ElementNode, ID, TreeNode } from "@/types/project";
-import { isPageRoot, isDescendant } from "@/store/project/utils";
+import { isPageRoot } from "@/store/project/utils";
 
 // Icon selector based on HTML tag
 const getLayerIcon = (tag: string) => {
@@ -84,6 +84,8 @@ interface LayerItemProps {
   searchFilter: string;
   collapsedIds: Set<ID>;
   onToggleCollapse: (id: ID) => void;
+  /** Ancestor chain of the current selection, computed once in LayersTab. */
+  selectionAncestorIds: Set<ID>;
 }
 
 const LayerItem: React.FC<LayerItemProps> = ({
@@ -92,11 +94,11 @@ const LayerItem: React.FC<LayerItemProps> = ({
   searchFilter,
   collapsedIds,
   onToggleCollapse,
+  selectionAncestorIds,
 }) => {
   const node = useProjectStore((state) => state.project.elements[nodeId]) as
     | TreeNode
     | undefined;
-  const elements = useProjectStore((state) => state.project.elements);
   const pages = useProjectStore((state) => state.project.pages);
   const renameNode = useProjectStore((state) => state.renameNode);
   const removeNode = useProjectStore((state) => state.removeNode);
@@ -115,11 +117,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
   const isRoot = isPageRoot(pages, nodeId);
 
   // Purely derived expanded state: auto-expanded if an ancestor of selectedNodeId
-  const isAncestorOfSelected = Boolean(
-    selectedNodeId &&
-      selectedNodeId !== nodeId &&
-      isDescendant(elements, nodeId, selectedNodeId)
-  );
+  const isAncestorOfSelected = selectionAncestorIds.has(nodeId);
   const isExpanded = isAncestorOfSelected || !collapsedIds.has(nodeId);
 
   useEffect(() => {
@@ -210,7 +208,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
   const handleMove = (e: React.MouseEvent, direction: "up" | "down") => {
     e.stopPropagation();
     if (isRoot || !node.parentId) return;
-    const parent = elements[node.parentId];
+    const parent = useProjectStore.getState().project.elements[node.parentId];
     if (!parent || parent.type !== "element") return;
 
     const currentIndex = parent.children.indexOf(nodeId);
@@ -410,6 +408,7 @@ const LayerItem: React.FC<LayerItemProps> = ({
               searchFilter={searchFilter}
               collapsedIds={collapsedIds}
               onToggleCollapse={onToggleCollapse}
+              selectionAncestorIds={selectionAncestorIds}
             />
           ))}
         </div>
@@ -423,14 +422,38 @@ export const LayersTab: React.FC = () => {
   const [collapsedIds, setCollapsedIds] = useState<Set<ID>>(new Set());
 
   const pages = useProjectStore((state) => state.project.pages);
-  const elements = useProjectStore((state) => state.project.elements);
   const activePageId = useEditorStore((state) => state.activePageId);
   const setActivePageId = useEditorStore((state) => state.setActivePageId);
+  const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
 
   const activePage = pages[activePageId] || Object.values(pages)[0];
   const rootElementId = activePage?.rootElementId || "root";
 
-  const totalElementsCount = Object.keys(elements).length;
+  // Narrow selectors: a plain count/boolean is Object.is-stable across
+  // edits that don't add/remove nodes, unlike subscribing to `elements`
+  // wholesale (which every LayerItem used to do — see selectionAncestorIds
+  // below for why the ancestor walk is centralized here instead).
+  const totalElementsCount = useProjectStore((state) => Object.keys(state.project.elements).length);
+  const rootElementExists = useProjectStore((state) => Boolean(state.project.elements[rootElementId]));
+
+  // Ancestor chain of the current selection, walked once here rather than
+  // as a per-row isDescendant tree-walk in every LayerItem. Built via
+  // useMemo, NOT inline inside the Zustand selector above — a selector
+  // that returns a freshly-constructed object every call breaks
+  // useSyncExternalStore's snapshot-caching contract and causes an
+  // infinite re-render loop (confirmed live: "Maximum update depth
+  // exceeded"). useMemo has no such constraint.
+  const elements = useProjectStore((state) => state.project.elements);
+  const selectionAncestorIds = useMemo(() => {
+    const ids = new Set<ID>();
+    let currentId = selectedNodeId ? elements[selectedNodeId]?.parentId ?? null : null;
+    while (currentId) {
+      ids.add(currentId);
+      const next = elements[currentId];
+      currentId = next ? next.parentId : null;
+    }
+    return ids;
+  }, [elements, selectedNodeId]);
 
   const handleToggleCollapse = (id: ID) => {
     setCollapsedIds((prev) => {
@@ -491,13 +514,14 @@ export const LayersTab: React.FC = () => {
 
       {/* Layer Tree Scroll Area */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden py-1.5">
-        {elements[rootElementId] ? (
+        {rootElementExists ? (
           <LayerItem
             nodeId={rootElementId}
             depth={0}
             searchFilter={searchQuery.toLowerCase().trim()}
             collapsedIds={collapsedIds}
             onToggleCollapse={handleToggleCollapse}
+            selectionAncestorIds={selectionAncestorIds}
           />
         ) : (
           <div className="p-6 text-center text-xs text-muted-foreground">

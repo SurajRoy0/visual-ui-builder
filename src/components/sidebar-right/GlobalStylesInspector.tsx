@@ -24,9 +24,21 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from "@/components/ui/accordion";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import { AlertTriangle } from "lucide-react";
 import { useProjectStore } from "@/store/project/projectStore";
 import { DEFAULT_PROJECT_STYLES } from "@/store/project/createInitialProject";
 import { loadGoogleFont } from "@/lib/fontLoader";
+import { countElementsReferencingCssVar } from "@/store/project/selectors";
 import { BoxShadowControl } from "./controls/BoxShadowControl";
 import { FontFamilyPicker } from "./controls/FontFamilyPicker";
 
@@ -106,6 +118,41 @@ export const GlobalStylesInspector: React.FC = () => {
     if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
     copyTimerRef.current = setTimeout(() => setCopiedKey(null), 1500);
   }, []);
+
+  // Deleting a token that's still referenced by elements (via var(--...))
+  // would leave those references dangling with no warning — so check
+  // usage first and confirm before actually removing it.
+  const [pendingDelete, setPendingDelete] = useState<{
+    tokenLabel: string;
+    name: string;
+    usageCount: number;
+    onConfirm: () => void;
+  } | null>(null);
+
+  const requestDeleteToken = useCallback(
+    (tokenLabel: string, name: string, cssVarNeedle: string, remove: (name: string) => void) => {
+      const usageCount = countElementsReferencingCssVar(
+        useProjectStore.getState().project.elements,
+        cssVarNeedle
+      );
+
+      if (usageCount === 0) {
+        remove(name);
+        return;
+      }
+
+      setPendingDelete({
+        tokenLabel,
+        name,
+        usageCount,
+        onConfirm: () => {
+          remove(name);
+          setPendingDelete(null);
+        },
+      });
+    },
+    []
+  );
 
   const q = searchQuery.toLowerCase().trim();
 
@@ -233,7 +280,7 @@ export const GlobalStylesInspector: React.FC = () => {
       </div>
 
       <Accordion
-        type="multiple"
+        multiple
         defaultValue={["colors", "typography"]}
         className="w-full"
       >
@@ -291,7 +338,7 @@ export const GlobalStylesInspector: React.FC = () => {
               <div className="grid grid-cols-2 gap-1.5">
                 {filteredColors.length === 0 && (
                   <p className="col-span-2 text-center text-[11px] text-muted-foreground py-3">
-                    No color tokens yet. Click "Add Color" to create one.
+                    No color tokens yet. Click &ldquo;Add Color&rdquo; to create one.
                   </p>
                 )}
                 {filteredColors.map(([name, hex]) => (
@@ -326,7 +373,7 @@ export const GlobalStylesInspector: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => removeColorToken(name)}
+                        onClick={() => requestDeleteToken("Color", name, `--color-${name}`, removeColorToken)}
                         className="p-1 text-muted-foreground hover:text-destructive cursor-pointer"
                         title="Delete token"
                       >
@@ -411,7 +458,7 @@ export const GlobalStylesInspector: React.FC = () => {
               <div className="space-y-1.5">
                 {filteredTypography.length === 0 && (
                   <p className="text-center text-[11px] text-muted-foreground py-3">
-                    No typography presets yet. Click "Add Preset" to create one.
+                    No typography presets yet. Click &ldquo;Add Preset&rdquo; to create one.
                   </p>
                 )}
                 {filteredTypography.map(([name, token]) => (
@@ -429,7 +476,7 @@ export const GlobalStylesInspector: React.FC = () => {
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => removeTypographyToken(name)}
+                          onClick={() => requestDeleteToken("Typography preset", name, `--typography-${name}-`, removeTypographyToken)}
                           className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive cursor-pointer transition-opacity"
                           title="Delete token"
                         >
@@ -513,7 +560,7 @@ export const GlobalStylesInspector: React.FC = () => {
               <div className="grid grid-cols-3 gap-1.5">
                 {filteredRadii.length === 0 && (
                   <p className="col-span-3 text-center text-[11px] text-muted-foreground py-3">
-                    No border radii yet. Click "Add Radius" to create one.
+                    No border radii yet. Click &ldquo;Add Radius&rdquo; to create one.
                   </p>
                 )}
                 {filteredRadii.map(([name, val]) => (
@@ -533,7 +580,7 @@ export const GlobalStylesInspector: React.FC = () => {
                     />
                     <button
                       type="button"
-                      onClick={() => removeRadiusToken(name)}
+                      onClick={() => requestDeleteToken("Radius", name, `--radius-${name}`, removeRadiusToken)}
                       className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-0.5 text-muted-foreground hover:text-destructive cursor-pointer transition-opacity"
                       title="Delete radius token"
                     >
@@ -597,7 +644,7 @@ export const GlobalStylesInspector: React.FC = () => {
               <div className="space-y-1.5">
                 {filteredShadows.length === 0 && (
                   <p className="text-center text-[11px] text-muted-foreground py-3">
-                    No shadow tokens yet. Click "Add Shadow" to create one.
+                    No shadow tokens yet. Click &ldquo;Add Shadow&rdquo; to create one.
                   </p>
                 )}
                 {filteredShadows.map(([name, val]) => (
@@ -626,7 +673,7 @@ export const GlobalStylesInspector: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => removeShadowToken(name)}
+                        onClick={() => requestDeleteToken("Shadow", name, `--shadow-${name}`, removeShadowToken)}
                         className="p-1 text-muted-foreground hover:text-destructive cursor-pointer"
                         title="Delete token"
                       >
@@ -702,7 +749,7 @@ export const GlobalStylesInspector: React.FC = () => {
               <div className="space-y-1.5">
                 {filteredFonts.length === 0 && (
                   <p className="text-center text-[11px] text-muted-foreground py-3">
-                    No project fonts yet. Click "Add Font" to create one.
+                    No project fonts yet. Click &ldquo;Add Font&rdquo; to create one.
                   </p>
                 )}
                 {filteredFonts.map(([name, token]) => (
@@ -730,7 +777,7 @@ export const GlobalStylesInspector: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => removeFontToken(name)}
+                        onClick={() => requestDeleteToken("Font", name, `--font-${name}`, removeFontToken)}
                         className="p-1 text-muted-foreground hover:text-destructive cursor-pointer"
                         title="Delete token"
                       >
@@ -791,7 +838,7 @@ export const GlobalStylesInspector: React.FC = () => {
               <div className="grid grid-cols-2 gap-1.5">
                 {filteredSpacing.length === 0 && (
                   <p className="col-span-2 text-center text-[11px] text-muted-foreground py-3">
-                    No spacing tokens yet. Click "Add Step" to create one.
+                    No spacing tokens yet. Click &ldquo;Add Step&rdquo; to create one.
                   </p>
                 )}
                 {filteredSpacing.map(([name, val]) => (
@@ -806,7 +853,7 @@ export const GlobalStylesInspector: React.FC = () => {
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => removeSpacingToken(name)}
+                        onClick={() => requestDeleteToken("Spacing", name, `--spacing-${name}`, removeSpacingToken)}
                         className="opacity-0 group-hover:opacity-100 p-0.5 text-muted-foreground hover:text-destructive cursor-pointer"
                       >
                         <Trash2 className="size-2.5" />
@@ -871,7 +918,7 @@ export const GlobalStylesInspector: React.FC = () => {
               <div className="space-y-1.5">
                 {filteredVars.length === 0 && (
                   <p className="text-center text-[11px] text-muted-foreground py-3">
-                    No custom variables yet. Click "Add Var" to create one.
+                    No custom variables yet. Click &ldquo;Add Var&rdquo; to create one.
                   </p>
                 )}
                 {filteredVars.map(([name, val]) => (
@@ -894,7 +941,14 @@ export const GlobalStylesInspector: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => removeVariableToken(name)}
+                        onClick={() =>
+                          requestDeleteToken(
+                            "Variable",
+                            name,
+                            name.startsWith("--") ? name : `--${name}`,
+                            removeVariableToken
+                          )
+                        }
                         className="p-1 text-muted-foreground hover:text-destructive cursor-pointer"
                         title="Delete variable"
                       >
@@ -908,6 +962,41 @@ export const GlobalStylesInspector: React.FC = () => {
           </AccordionItem>
         )}
       </Accordion>
+
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-2.5 text-destructive">
+              <div className="w-8 h-8 rounded-md bg-destructive/10 flex items-center justify-center shrink-0">
+                <AlertTriangle className="size-4.5" />
+              </div>
+              <AlertDialogTitle>Delete {pendingDelete?.tokenLabel} Token?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="pt-2">
+              &ldquo;{pendingDelete?.name}&rdquo; is still referenced by{" "}
+              {pendingDelete?.usageCount} element{pendingDelete?.usageCount === 1 ? "" : "s"}.
+              Deleting it will leave those references pointing at nothing.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel onClick={() => setPendingDelete(null)} className="cursor-pointer rounded-md">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => pendingDelete?.onConfirm()}
+              className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive/90 cursor-pointer rounded-md"
+            >
+              <Trash2 className="size-3.5" />
+              Delete Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

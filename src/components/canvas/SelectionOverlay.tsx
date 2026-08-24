@@ -15,7 +15,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useEditorStore } from "@/store/editor";
 import { useProjectStore } from "@/store/project";
-import { isPageRoot } from "@/store/project/utils";
+import { isPageRoot, collectDescendantIds } from "@/store/project/utils";
 import {
   computeResize,
   formatDimensions,
@@ -23,7 +23,21 @@ import {
   type InitialBounds,
 } from "@/lib/resizeMath";
 import { getRelativeElementRect, type Rect } from "@/lib/canvasCoordinates";
+import { isDefaultBreakpoint as computeIsDefaultBreakpoint, resolveActiveBreakpoint } from "@/store/project/selectors";
+import {
+  gatherDropContext,
+  computeDropResult,
+  type DropTargetResult,
+} from "@/lib/dropTargetResolution";
+import { DropIndicatorOverlay } from "./DropIndicatorOverlay";
 import type { ElementNode } from "@/types/project";
+
+function parsePxValue(value: string | number | undefined): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "number") return value;
+  const parsed = parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
 
 const HANDLES: { dir: ResizeHandleDirection; cursor: string; className: string }[] = [
   { dir: "nw", cursor: "cursor-nwse-resize", className: "-left-1.5 -top-1.5" },
@@ -40,7 +54,9 @@ export const SelectionOverlay: React.FC = () => {
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
   const activeBreakpointId = useEditorStore((state) => state.activeBreakpointId);
   const zoom = useEditorStore((state) => state.zoom);
-  const elements = useProjectStore((state) => state.project.elements);
+  const selectedNode = useProjectStore((state) =>
+    selectedNodeId ? (state.project.elements[selectedNodeId] as ElementNode | undefined) : null
+  );
   const pages = useProjectStore((state) => state.project.pages);
   const breakpoints = useProjectStore((state) => state.project.breakpoints);
   const updateNodeStyle = useProjectStore((state) => state.updateNodeStyle);
@@ -50,17 +66,29 @@ export const SelectionOverlay: React.FC = () => {
   const [activeHandle, setActiveHandle] = useState<ResizeHandleDirection | null>(null);
   const [isMoving, setIsMoving] = useState(false);
   const [transientSize, setTransientSize] = useState<{ width: number; height: number } | null>(null);
+  // Existing-node drag (reorder/reparent) — Section 7/13 of the architecture
+  // doc: distinct from toolbox-create drag and resize, sharing only the
+  // low-level drop-target-resolution utilities.
+  const [isDraggingNode, setIsDraggingNode] = useState(false);
+  const [nodeDropTarget, setNodeDropTarget] = useState<DropTargetResult | null>(null);
+
+  // Window-level pointer listeners from an in-progress resize/move gesture
+  // are normally torn down on pointerup, but a component unmount
+  // mid-gesture would otherwise leak them.
+  const activeGestureCleanupRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    return () => {
+      activeGestureCleanupRef.current?.();
+    };
+  }, []);
 
   const overlayRef = useRef<HTMLDivElement>(null);
   const movingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const isRoot = selectedNodeId ? isPageRoot(pages, selectedNodeId) : false;
-  const selectedNode = selectedNodeId ? (elements[selectedNodeId] as ElementNode | undefined) : null;
 
-  const activeBreakpoint =
-    breakpoints.find((b) => b.id === activeBreakpointId) ||
-    breakpoints[0] || { id: "bp-desktop", name: "Desktop", minWidth: 1200, isDefault: true };
-  const isDefaultBreakpoint = activeBreakpoint.isDefault ?? (activeBreakpoint.minWidth >= 1200);
+  const activeBreakpoint = resolveActiveBreakpoint(breakpoints, activeBreakpointId);
+  const isDefaultBreakpoint = computeIsDefaultBreakpoint(activeBreakpoint);
 
   const nodeStyleKey = selectedNode
     ? JSON.stringify({
@@ -68,6 +96,10 @@ export const SelectionOverlay: React.FC = () => {
         bp: selectedNode.breakpointStyles?.[activeBreakpointId],
       })
     : "";
+
+  const effectiveStyle = selectedNode
+    ? { ...(selectedNode.style || {}), ...(selectedNode.breakpointStyles?.[activeBreakpointId] || {}) }
+    : null;
 
   // Sync overlay position with rendered element's DOM bounding rect
   const updateOverlayPosition = useCallback(() => {
@@ -201,8 +233,26 @@ export const SelectionOverlay: React.FC = () => {
       top: overlayRect.top,
     };
 
+    // Resize must respect the node's own configured constraints, not
+    // hardcoded fallbacks — a node with e.g. max-width: 300px should not
+    // be draggable past that during the live preview.
+    const minWidth = parsePxValue(effectiveStyle?.minWidth);
+    const maxWidth = parsePxValue(effectiveStyle?.maxWidth);
+    const minHeight = parsePxValue(effectiveStyle?.minHeight);
+    const maxHeight = parsePxValue(effectiveStyle?.maxHeight);
+
+    // Only absolute/fixed-positioned nodes have a meaningful left/top to
+    // adjust when resizing from the w/n/nw/ne/sw handles (flow-layout
+    // nodes ignore left/top entirely, so injecting them would silently
+    // add positioning the user never asked for).
+    const isPositioned = effectiveStyle?.position === "absolute" || effectiveStyle?.position === "fixed";
+    const initialLeft = parsePxValue(effectiveStyle?.left) ?? 0;
+    const initialTop = parsePxValue(effectiveStyle?.top) ?? 0;
+
     let latestWidth = initialBounds.width;
     let latestHeight = initialBounds.height;
+    let latestLeftDelta = 0;
+    let latestTopDelta = 0;
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
       const delta = {
@@ -215,27 +265,42 @@ export const SelectionOverlay: React.FC = () => {
         initialBounds,
         delta,
         zoom: zoom || 1,
+        minWidth,
+        maxWidth,
+        minHeight,
+        maxHeight,
       });
 
       latestWidth = result.width;
       latestHeight = result.height;
+      latestLeftDelta = result.leftDelta;
+      latestTopDelta = result.topDelta;
 
       // 60fps Transient visual update directly on the DOM element (no ProjectStore mutation)
       domEl.style.width = `${result.width}px`;
       domEl.style.height = `${result.height}px`;
+      if (isPositioned) {
+        if (result.leftDelta) domEl.style.left = `${initialLeft + result.leftDelta}px`;
+        if (result.topDelta) domEl.style.top = `${initialTop + result.topDelta}px`;
+      }
 
       setTransientSize({ width: result.width, height: result.height });
-      setOverlayRect((prev) =>
-        prev
-          ? {
-              ...prev,
-              width: result.width,
-              height: result.height,
-              right: prev.left + result.width,
-              bottom: prev.top + result.height,
-            }
-          : null
-      );
+      setOverlayRect((prev) => {
+        if (!prev) return null;
+        // overlayRect is already in unzoomed document space (getRelativeElementRect
+        // divides by zoom), the same space computeResize's leftDelta/topDelta are in.
+        const nextLeft = isPositioned ? initialBounds.left + result.leftDelta : prev.left;
+        const nextTop = isPositioned ? initialBounds.top + result.topDelta : prev.top;
+        return {
+          ...prev,
+          left: nextLeft,
+          top: nextTop,
+          width: result.width,
+          height: result.height,
+          right: nextLeft + result.width,
+          bottom: nextTop + result.height,
+        };
+      });
     };
 
     const handlePointerUp = (upEvent: PointerEvent) => {
@@ -248,22 +313,25 @@ export const SelectionOverlay: React.FC = () => {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
       window.removeEventListener("pointercancel", handlePointerUp);
+      activeGestureCleanupRef.current = null;
 
       setActiveHandle(null);
       setTransientSize(null);
 
       // Commit final dimensions to ProjectStore (ONE history entry)
       if (selectedNodeId) {
+        const patch: { width: string; height: string; left?: string; top?: string } = {
+          width: `${latestWidth}px`,
+          height: `${latestHeight}px`,
+        };
+        if (isPositioned) {
+          if (latestLeftDelta) patch.left = `${initialLeft + latestLeftDelta}px`;
+          if (latestTopDelta) patch.top = `${initialTop + latestTopDelta}px`;
+        }
         if (isDefaultBreakpoint) {
-          updateNodeStyle(selectedNodeId, {
-            width: `${latestWidth}px`,
-            height: `${latestHeight}px`,
-          });
+          updateNodeStyle(selectedNodeId, patch);
         } else {
-          updateBreakpointStyle(selectedNodeId, activeBreakpointId, {
-            width: `${latestWidth}px`,
-            height: `${latestHeight}px`,
-          });
+          updateBreakpointStyle(selectedNodeId, activeBreakpointId, patch);
         }
       }
 
@@ -273,6 +341,100 @@ export const SelectionOverlay: React.FC = () => {
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", handlePointerUp);
     window.addEventListener("pointercancel", handlePointerUp);
+    activeGestureCleanupRef.current = () => handlePointerUp(new PointerEvent("pointercancel"));
+  };
+
+  // Handle pointer down on the selection box body (drag to reorder/reparent)
+  const handleMovePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isRoot || !selectedNodeId || !selectedNode) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const domEl = document.querySelector<HTMLElement>(`[data-node-id="${selectedNodeId}"]`);
+    const viewportEl =
+      domEl?.closest<HTMLElement>("[data-canvas-viewport]") ||
+      (domEl?.closest(".shadow-2xl") as HTMLElement | null);
+    if (!domEl || !viewportEl) return;
+
+    e.currentTarget.setPointerCapture(e.pointerId);
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const DRAG_THRESHOLD_PX = 4;
+
+    // Snapshot once — nothing mutates the document while this drag is
+    // only previewing (hover-only, per Section 8 of the architecture doc).
+    const { elements, pages: snapshotPages } = useProjectStore.getState().project;
+    const excludeIds = new Set(collectDescendantIds(elements, selectedNodeId));
+    const activePageId = useEditorStore.getState().activePageId;
+    const activePage = snapshotPages[activePageId] || Object.values(snapshotPages)[0];
+    const rootId = activePage?.rootElementId || "root";
+    const draggedTag = selectedNode.tag || "div";
+
+    let dragStarted = false;
+    let latestResult: DropTargetResult | null = null;
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      if (!dragStarted) {
+        if (
+          Math.abs(moveEvent.clientX - startX) < DRAG_THRESHOLD_PX &&
+          Math.abs(moveEvent.clientY - startY) < DRAG_THRESHOLD_PX
+        ) {
+          return;
+        }
+        dragStarted = true;
+        setIsDraggingNode(true);
+      }
+
+      const { containerRect, candidates } = gatherDropContext(viewportEl, elements);
+      const result = computeDropResult({
+        clientX: moveEvent.clientX,
+        clientY: moveEvent.clientY,
+        containerRect,
+        candidates,
+        zoom,
+        elements,
+        activePageRootId: rootId,
+        draggedItem: draggedTag,
+        excludeNodeIds: excludeIds,
+      });
+
+      latestResult = result;
+      setNodeDropTarget(result);
+    };
+
+    const handlePointerUp = (upEvent: PointerEvent) => {
+      try {
+        e.currentTarget.releasePointerCapture(upEvent.pointerId);
+      } catch {
+        // Pointer capture already released
+      }
+
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerUp);
+      activeGestureCleanupRef.current = null;
+
+      setIsDraggingNode(false);
+      setNodeDropTarget(null);
+
+      // Commit exactly once, on release (ONE undo entry) — moveNode itself
+      // re-validates isDescendant/isPageRoot before mutating.
+      if (dragStarted && latestResult && latestResult.allowed) {
+        useProjectStore.getState().moveNode({
+          nodeId: selectedNodeId,
+          newParentId: latestResult.parentId,
+          index: latestResult.index,
+        });
+      }
+
+      updateOverlayPosition();
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    window.addEventListener("pointercancel", handlePointerUp);
+    activeGestureCleanupRef.current = () => handlePointerUp(new PointerEvent("pointercancel"));
   };
 
   if (!selectedNodeId || !overlayRect || !selectedNode) {
@@ -282,7 +444,7 @@ export const SelectionOverlay: React.FC = () => {
   const tagName = selectedNode.type === "element" ? selectedNode.tag : "comp";
   const displayName = isRoot ? "Page Root" : selectedNode.name || tagName;
 
-  const isNudgeOrResize = isMoving || activeHandle !== null;
+  const isNudgeOrResize = isMoving || activeHandle !== null || isDraggingNode;
 
   return (
     <div
@@ -315,9 +477,20 @@ export const SelectionOverlay: React.FC = () => {
           </div>
         )}
 
+        {/* Drag-to-move body hotspot — sits under the resize handles (rendered
+            after it, so they still win hit-testing at the corners/edges).
+            Not shown for the page root, which can't be reparented. */}
+        {!isRoot && !activeHandle && (
+          <div
+            onPointerDown={handleMovePointerDown}
+            className="absolute inset-0 pointer-events-auto cursor-move"
+          />
+        )}
+
         {/* 8 Interactive Resize Handles - hidden while actively resizing or moving */}
         {!activeHandle &&
           !isMoving &&
+          !isDraggingNode &&
           HANDLES.map(({ dir, cursor, className }) => (
             <div
               key={dir}
@@ -326,6 +499,14 @@ export const SelectionOverlay: React.FC = () => {
             />
           ))}
       </div>
+
+      {isDraggingNode && (
+        <DropIndicatorOverlay
+          dropTarget={nodeDropTarget}
+          draggedItem={{ tag: tagName }}
+          actionVerb="Move"
+        />
+      )}
     </div>
   );
 };

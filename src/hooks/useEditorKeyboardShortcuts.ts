@@ -16,6 +16,7 @@ import { useEffect } from "react";
 import { useEditorStore } from "@/store/editor";
 import { useProjectStore } from "@/store/project";
 import { isPageRoot } from "@/store/project/utils";
+import { isDefaultBreakpoint as computeIsDefaultBreakpoint, resolveActiveBreakpoint } from "@/store/project/selectors";
 import type { ElementNode } from "@/types/project";
 
 export function useEditorKeyboardShortcuts() {
@@ -28,17 +29,17 @@ export function useEditorKeyboardShortcuts() {
   const setIsSpacePanning = useEditorStore((state) => state.setIsSpacePanning);
   const setIsHelpModalOpen = useEditorStore((state) => state.setIsHelpModalOpen);
 
-  const elements = useProjectStore((state) => state.project.elements);
-  const pages = useProjectStore((state) => state.project.pages);
-  const breakpoints = useProjectStore((state) => state.project.breakpoints);
+  // elements/pages/breakpoints/canUndo/canRedo are only ever read inside
+  // handleKeyDown below, never for render — subscribing to them here would
+  // just re-register the window listener (and re-render whatever component
+  // calls this hook) on every unrelated document edit. Read fresh via
+  // getState() at the moment a shortcut actually fires instead.
   const removeNode = useProjectStore((state) => state.removeNode);
   const duplicateNode = useProjectStore((state) => state.duplicateNode);
   const updateNodeStyle = useProjectStore((state) => state.updateNodeStyle);
   const updateBreakpointStyle = useProjectStore((state) => state.updateBreakpointStyle);
   const undo = useProjectStore((state) => state.undo);
   const redo = useProjectStore((state) => state.redo);
-  const canUndo = useProjectStore((state) => state.past.length > 0);
-  const canRedo = useProjectStore((state) => state.future.length > 0);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -88,17 +89,18 @@ export function useEditorKeyboardShortcuts() {
       // 3. Undo / Redo (Cmd/Ctrl + Z, Cmd/Ctrl + Shift + Z / Cmd/Ctrl + Y)
       if (isCmdOrCtrl && e.key.toLowerCase() === "z") {
         e.preventDefault();
+        const { past, future } = useProjectStore.getState();
         if (e.shiftKey) {
-          if (canRedo) redo();
+          if (future.length > 0) redo();
         } else {
-          if (canUndo) undo();
+          if (past.length > 0) undo();
         }
         return;
       }
 
       if (isCmdOrCtrl && e.key.toLowerCase() === "y") {
         e.preventDefault();
-        if (canRedo) redo();
+        if (useProjectStore.getState().future.length > 0) redo();
         return;
       }
 
@@ -141,7 +143,7 @@ export function useEditorKeyboardShortcuts() {
 
       // 8. Duplicate (Cmd/Ctrl + D)
       if (isCmdOrCtrl && e.key.toLowerCase() === "d") {
-        if (selectedNodeId && !isPageRoot(pages, selectedNodeId)) {
+        if (selectedNodeId && !isPageRoot(useProjectStore.getState().project.pages, selectedNodeId)) {
           e.preventDefault();
           const newId = duplicateNode(selectedNodeId);
           if (newId) {
@@ -153,7 +155,7 @@ export function useEditorKeyboardShortcuts() {
 
       // 9. Delete (Delete or Backspace)
       if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectedNodeId && !isPageRoot(pages, selectedNodeId)) {
+        if (selectedNodeId && !isPageRoot(useProjectStore.getState().project.pages, selectedNodeId)) {
           e.preventDefault();
           removeNode(selectedNodeId);
           setSelectedNodeId(null);
@@ -162,6 +164,7 @@ export function useEditorKeyboardShortcuts() {
       }
 
       // 10. Arrow Key Nudge (1px, or 10px with Shift)
+      const { elements, pages, breakpoints } = useProjectStore.getState().project;
       if (
         ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key) &&
         selectedNodeId &&
@@ -171,10 +174,8 @@ export function useEditorKeyboardShortcuts() {
         const node = elements[selectedNodeId] as ElementNode | undefined;
         if (!node || node.type !== "element") return;
 
-        const activeBreakpoint =
-          breakpoints.find((b) => b.id === activeBreakpointId) ||
-          breakpoints[0] || { id: "bp-desktop", name: "Desktop", minWidth: 1200, isDefault: true };
-        const isDefaultBreakpoint = activeBreakpoint.isDefault ?? (activeBreakpoint.minWidth >= 1200);
+        const activeBreakpoint = resolveActiveBreakpoint(breakpoints, activeBreakpointId);
+        const isDefaultBreakpoint = computeIsDefaultBreakpoint(activeBreakpoint);
 
         const bpOverrides = (node.breakpointStyles?.[activeBreakpointId] || {}) as Partial<ElementNode["style"]>;
         const style = { ...(node.style || {}), ...bpOverrides };
@@ -248,9 +249,6 @@ export function useEditorKeyboardShortcuts() {
   }, [
     selectedNodeId,
     activeBreakpointId,
-    elements,
-    pages,
-    breakpoints,
     setSelectedNodeId,
     setZoom,
     resetZoom,
@@ -263,7 +261,5 @@ export function useEditorKeyboardShortcuts() {
     updateBreakpointStyle,
     undo,
     redo,
-    canUndo,
-    canRedo,
   ]);
 }

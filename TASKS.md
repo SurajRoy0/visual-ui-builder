@@ -87,11 +87,13 @@ store.
 - `isPageRoot(pages, nodeId)` — **must** be checked before deleting
   or reparenting a node, to prevent orphaning a page (a page whose
   `rootElementId` points at nothing).
-- **VERIFY:** these two guards exist in `utils.ts` but it has not
-  been confirmed that `elementsSlice.moveNode` / `removeNode` (or
-  their current equivalents) actually call them. Treat this as an
-  open bug risk until confirmed — do not build drag-and-drop reparent
-  UI on top of an unguarded `moveNode`.
+- **CONFIRMED:** `elementsSlice.moveNode` calls `isDescendant` (rejects
+  moving a node into its own descendant) and `isPageRoot` (rejects
+  reparenting a page root); `removeNode`/`duplicateNode` also call
+  `isPageRoot`. Verified by direct code read — the drag-and-drop
+  reparent UI (Section 7/13, canvas-node drag-to-reorder) is built on
+  top of this and additionally excludes the dragged node's own subtree
+  from candidate drop targets at hover-time.
 
 ### 3.4 Style resolution precedence (computed at read time, never pre-baked into stored data)
 
@@ -226,7 +228,7 @@ build one as a stand-in for the other.
 ## 4. Open Decisions & Confirmed Architecture
 
 - ✅ **Persistence strategy (IMPLEMENTED):** Autosave to IndexedDB behind a `ProjectRepository` interface. Project Dashboard at `/editor`, Create Project modal, dynamic `/editor/[projectId]` routing, delete confirmation modal, and debounced autosave with unmount flush.
-- **`isDescendant`/`isPageRoot` wiring status** (see 3.3) — confirm before building any UI that assumes reparenting/deletion is already safe.
+- ✅ **`isDescendant`/`isPageRoot` wiring status (CONFIRMED)** — see 3.3.
 - ✅ **Canvas-to-store wiring status (CONFIRMED & IMPLEMENTED):** Canvas dynamically renders the live `project.elements` tree using recursive `ElementRenderer` with granular subscriptions, effective style resolution, interactive selection, and simulated viewport sizing.
 
 ---
@@ -294,9 +296,15 @@ Library Element → Drag → Potential Parent → Validate (element rules
 
 Blocks e.g. `<li>` outside a list, `<option>` outside
 `<select>`/`<optgroup>`, children inside void elements, and any
-reparent that would create a cycle. Pure `computeDropResult` geometry
-and semantic resolution with live `inside`/`before`/`after` visual indicators
-and atomic Immer `mutate`/`batch` history commits.
+reparent that would create a cycle. `computeDropResult` (pure — takes
+pointer coords + pre-gathered candidate rects, no DOM access) and
+`gatherDropContext` (the sole DOM-touching function, walks the
+rendered viewport into plain-data rects) with live `inside`/`before`/`after`
+visual indicators and atomic Immer `mutate`/`batch` history commits.
+`draggedItem` accepts either an `ElementDefinitionItem` (toolbox
+create) or a bare `HTMLTagName` (moving an existing node), and an
+optional `excludeNodeIds` set lets a caller remove a subtree from
+candidates — this is what Phase 5's existing-node drag reuses below.
 
 ### Phase 5 — Real-Time Move & Resize
 **Status:** ✅ Completed
@@ -304,18 +312,31 @@ and atomic Immer `mutate`/`batch` history commits.
 Follows Section 3.11 & 15 exactly: 8-directional interactive resize
 handles (`nw`, `n`, `ne`, `e`, `se`, `s`, `sw`, `w`) with transient
 60fps DOM preview bypassing `ProjectStore` during active gestures,
-committing exactly one atomic `updateNodeStyle` on `pointerup`.
+committing exactly one atomic `updateNodeStyle` on `pointerup`. Resize
+respects the node's own `min/maxWidth/Height` style during the live
+preview (not hardcoded 16px/4000px fallbacks), and dragging the
+w/n/nw/ne/sw handles on an absolute/fixed-positioned node repositions
+`left`/`top` from the dragged edge via `resizeMath`'s `leftDelta`/`topDelta`.
 Includes live dimension tooltip badge, automatic ResizeObserver tracking,
 and keyboard navigation/nudge (1px normal, 10px with Shift, Delete/Backspace,
 and duplicate via `Cmd/Ctrl+D`).
 
-### Phase 6 — Property Panel
-**Status:** ✅ Completed (Wired to live store mutations: Dimensions, Flexbox, Typography, Appearance & Colors, Spacing, Attributes)
+Existing-canvas-node drag (reorder/reparent) is also implemented here
+(`SelectionOverlay.tsx`'s selection-box body, distinct from the resize
+handles) — hover-only preview via `gatherDropContext`/`computeDropResult`
+(dragged node + its own descendants excluded from candidates), commits
+exactly one `moveNode` call on drop, never touches the moved node's own
+style. This was the architecture doc's "Existing Canvas Node Drag"
+system (Section 7/13) — previously missing despite Phase 4 covering
+only toolbox-create drag.
 
-Grouped by: Layout, Spacing, Flex, Grid, Transform, Appearance,
-Typography, Transition — matching the `ElementStyle` composition in
-the schema. Panel should be driven by the schema/attribute-editor
-definitions, not hardcoded per element.
+### Phase 6 — Property Panel
+**Status:** ✅ Completed — Dimensions, Flexbox, Grid, Transform, Transition,
+Typography, Appearance & Colors, Spacing, Attributes; all grouped to
+match `ElementStyle`'s composition. Continuous inputs (text fields,
+the native color picker, opacity slider, box-shadow sliders) commit on
+blur/Enter/drag-release rather than on every keystroke/tick — verified
+live: typing a 10-character HTML ID produces exactly one undo entry.
 
 ### Phase 7 — Responsive Editing
 **Status:** ✅ Completed
@@ -334,8 +355,9 @@ Multi-device simulation with distinct Breakpoint vs. Viewport controls:
 Centralized design system engine under `project.styles`:
 - **Styles Slice & Store Actions**: Full CRUD for colors, typography, spacing, radii, shadows, fonts, and custom variables (`stylesSlice.ts`).
 - **Design Tokens Management Tab**: Comprehensive sidebar tab (`StylesTab.tsx`) to manage, edit, search, and reload curated default token presets.
-- **Property Inspector Token Pickers**: Color palette swatch popovers, Typography preset batch-selectors, and Radius/Spacing token linkers in `SelectedElementInspector.tsx`.
-- **Live Canvas CSS Variable Cascade**: Automatic serialization and binding of all design tokens into `--color-*`, `--spacing-*`, `--radius-*`, `--shadow-*`, `--font-*` on the canvas viewport screen container.
+- **Property Inspector Token Pickers**: Color palette swatch popovers, Typography preset selector, and Radius/Spacing token linkers in `SelectedElementInspector.tsx`. Typography presets write `var(--typography-[name]-*)` references (not a snapshot of the preset's current values), so editing a preset later keeps propagating to every node that applied it — same as color/radius tokens.
+- **Live Canvas CSS Variable Cascade**: Automatic serialization and binding of all design tokens into `--color-*`, `--spacing-*`, `--radius-*`, `--shadow-*`, `--font-*`, `--typography-[name]-*` on the canvas viewport screen container (`generateTokenCssVars` in `styleUtils.ts` — the single source of truth; don't reimplement this inline elsewhere).
+- **Delete-usage warning**: deleting a token first scans `project.elements` (`countElementsReferencingCssVar` in `selectors.ts`) for any node still referencing its CSS var, and confirms before deleting if usage > 0 — deleting an unused token still deletes immediately with no prompt.
 
 ### Phase 9 — Assets
 **Status:** ⏳ — needs `AssetsSlice` first (Section 5)

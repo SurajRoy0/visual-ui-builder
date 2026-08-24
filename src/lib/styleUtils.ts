@@ -302,6 +302,30 @@ export function generateTokenCssVars(projectStyles?: import("@/types/project").P
         }
     }
 
+    // Typography presets: one CSS var per field, so a node that applies
+    // a preset (var(--typography-[name]-font-size), etc.) keeps tracking
+    // it live instead of baking in a snapshot at apply-time.
+    if (projectStyles.typography) {
+        for (const [k, tok] of Object.entries(projectStyles.typography)) {
+            if (tok.fontFamily !== undefined) {
+                vars[`--typography-${k}-font-family`] = tok.fontFamily;
+            }
+            if (tok.fontSize !== undefined) {
+                vars[`--typography-${k}-font-size`] = typeof tok.fontSize === "number" ? `${tok.fontSize}px` : String(tok.fontSize);
+            }
+            if (tok.fontWeight !== undefined) {
+                vars[`--typography-${k}-font-weight`] = String(tok.fontWeight);
+            }
+            if (tok.lineHeight !== undefined) {
+                // Unitless by CSS convention (a multiplier), unlike spacing/radii.
+                vars[`--typography-${k}-line-height`] = String(tok.lineHeight);
+            }
+            if (tok.letterSpacing !== undefined) {
+                vars[`--typography-${k}-letter-spacing`] = typeof tok.letterSpacing === "number" ? `${tok.letterSpacing}px` : String(tok.letterSpacing);
+            }
+        }
+    }
+
     // Variables: --[name]
     if (projectStyles.variables) {
         for (const [k, v] of Object.entries(projectStyles.variables)) {

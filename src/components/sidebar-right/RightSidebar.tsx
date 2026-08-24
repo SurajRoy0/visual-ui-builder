@@ -15,9 +15,10 @@ type RightTab = "element" | "global";
 export const RightSidebar: React.FC = () => {
   const [activeTab, setActiveTab] = useState<RightTab>("element");
   const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
-  const elements = useProjectStore((state) => state.project.elements);
+  const selectedNode = useProjectStore((state) =>
+    selectedNodeId ? state.project.elements[selectedNodeId] : null
+  );
   const projectStyles = useProjectStore((state) => state.project.styles);
-  const selectedNode = selectedNodeId ? elements[selectedNodeId] : null;
 
   const tokenCssVars = React.useMemo(() => generateTokenCssVars(projectStyles), [projectStyles]);
 

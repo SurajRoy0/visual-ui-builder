@@ -5,7 +5,8 @@
 // Recursive element renderer adhering to Phase 2 architecture:
 // - Granular subscription: each node subscribes to its own state.
 // - Resolves effective styles: base styles + breakpoint overrides.
-// - Dispatches by HTML tag with proper HTML rules & attribute support.
+// - Dispatches by HTML tag via a lookup table (TAG_RENDERERS below),
+//   falling back to the generic container renderer.
 // - Complies with HTML void tags (img, input, hr, br, source).
 // - Selection and visual focus integration.
 // ============================================================
@@ -23,372 +24,308 @@ import { Button } from "@/components/ui/button";
 interface ElementRendererProps {
   nodeId: ID;
   isRoot?: boolean;
+  /** Internal — recursion depth, used only for the cycle/runaway-tree guard below. */
+  depth?: number;
 }
 
-export const ElementRenderer: React.FC<ElementRendererProps> = ({
-  nodeId,
-  isRoot = false,
-}) => {
-  const node = useProjectStore((state) => state.project.elements[nodeId]) as
-    | TreeNode
-    | undefined;
+// A corrupted or cyclic document (e.g. from a hand-edited import, bypassing
+// the write-time isDescendant guard) would otherwise recurse until the
+// browser hard-crashes with a stack overflow. Bail out with a visible
+// warning instead — this is a rendering-layer backstop, not the primary
+// tree-integrity check.
+const MAX_RENDER_DEPTH = 400;
 
-  const activeBreakpointId = useEditorStore((state) => state.activeBreakpointId);
-  const activeViewportId = useEditorStore((state) => state.activeViewportId);
-  const viewportWidth = useEditorStore((state) => state.viewportWidth);
-  const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
-  const setSelectedNodeId = useEditorStore((state) => state.setSelectedNodeId);
-  const viewports = useProjectStore((state) => state.project.viewports);
-  const addElementNode = useProjectStore((state) => state.addElementNode);
+// ============================================================
+// Tag renderers — each takes the same precomputed context and
+// returns this node's JSX. TAG_RENDERERS below dispatches to one
+// of these by tag; anything not listed falls back to
+// renderContainer. Plain functions, not components: they receive
+// already-resolved data and call no hooks themselves.
+// ============================================================
 
-  if (!node) {
-    return null;
-  }
+interface RenderCtx {
+  nodeId: ID;
+  tag: string;
+  elementNode: ElementNode;
+  attributes: Record<string, unknown>;
+  effectiveStyles: React.CSSProperties;
+  outlineClass: string;
+  isRoot: boolean;
+  depth: number;
+  handleClick: (e: React.MouseEvent) => void;
+  handleQuickAdd: (tag: "div" | "h1" | "section", name: string) => void;
+}
 
-  // Handle component instances or element nodes
-  if (node.type !== "element") {
-    return (
-      <div
-        onClick={(e) => {
-          e.stopPropagation();
-          setSelectedNodeId(nodeId);
-        }}
-        className={`p-3 rounded border border-dashed text-xs text-muted-foreground ${
-          selectedNodeId === nodeId ? "ring-2 ring-primary" : ""
-        }`}
-      >
-        Component: {node.name}
-      </div>
-    );
-  }
+function resolveTextContent(ctx: RenderCtx, fallback: string): string {
+  const rawContent = (ctx.elementNode as unknown as { content?: string }).content;
+  const rawAttrText = ctx.attributes?.textContent as string | undefined;
+  return typeof rawContent === "string"
+    ? rawContent
+    : typeof rawAttrText === "string"
+    ? rawAttrText
+    : fallback;
+}
 
-  const elementNode = node as ElementNode;
-  const isSelected = selectedNodeId === nodeId;
+function renderChildren(ctx: RenderCtx) {
+  return ctx.elementNode.children.map((childId) => (
+    <ElementRenderer key={childId} nodeId={childId} depth={ctx.depth + 1} />
+  ));
+}
 
-  const activeViewport =
-    viewports.find((v) => v.id === activeViewportId) ||
-    viewports[0] || { id: "vp-desktop", width: 1440, height: 900, name: "Desktop" };
-
-  const currentDisplayWidth = viewportWidth ?? activeViewport.width;
-
-  const simulatedViewport = {
-    width: currentDisplayWidth,
-    height: activeViewport.height,
-  };
-
-  // Resolve effective style for active breakpoint and simulated viewport
-  const effectiveStyles = resolveEffectiveStyles(
-    elementNode.style,
-    elementNode.breakpointStyles?.[activeBreakpointId],
-    simulatedViewport
+// 1. Image Elements (Void)
+function renderImg(ctx: RenderCtx) {
+  const { nodeId, tag, attributes, elementNode, effectiveStyles, outlineClass, handleClick } = ctx;
+  return (
+    <img
+      data-node-id={nodeId}
+      data-tag={tag}
+      src={
+        (attributes.src as string) ||
+        "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=600&auto=format&fit=crop&q=80"
+      }
+      alt={(attributes.alt as string) || elementNode.name || "Image"}
+      loading={(attributes.loading as "lazy" | "eager") || "lazy"}
+      style={effectiveStyles}
+      onClick={handleClick}
+      className={outlineClass}
+    />
   );
+}
 
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setSelectedNodeId(nodeId);
-  };
+// 2. Video Elements
+function renderVideo(ctx: RenderCtx) {
+  const { nodeId, tag, attributes, effectiveStyles, outlineClass, handleClick } = ctx;
+  return (
+    <video
+      data-node-id={nodeId}
+      data-tag={tag}
+      src={
+        (attributes.src as string) ||
+        "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+      }
+      poster={(attributes.poster as string) || undefined}
+      controls={attributes.controls !== false}
+      autoPlay={Boolean(attributes.autoPlay)}
+      loop={Boolean(attributes.loop)}
+      muted={Boolean(attributes.muted)}
+      playsInline={attributes.playsInline !== false}
+      preload={(attributes.preload as "auto" | "metadata" | "none") || "metadata"}
+      style={effectiveStyles}
+      onClick={handleClick}
+      className={outlineClass}
+    />
+  );
+}
 
-  const handleQuickAdd = (tag: "div" | "h1" | "section", name: string) => {
-    const newId = addElementNode({
-      tag,
-      parentId: nodeId,
-      name,
-    });
-    if (newId) {
-      setSelectedNodeId(newId);
-    }
-  };
+// 3. Audio Elements
+function renderAudio(ctx: RenderCtx) {
+  const { nodeId, tag, attributes, effectiveStyles, outlineClass, handleClick } = ctx;
+  return (
+    <audio
+      data-node-id={nodeId}
+      data-tag={tag}
+      src={(attributes.src as string) || undefined}
+      controls={attributes.controls !== false}
+      autoPlay={Boolean(attributes.autoPlay)}
+      loop={Boolean(attributes.loop)}
+      muted={Boolean(attributes.muted)}
+      preload={(attributes.preload as "auto" | "metadata" | "none") || "metadata"}
+      style={effectiveStyles}
+      onClick={handleClick}
+      className={outlineClass}
+    />
+  );
+}
 
-  const tag = elementNode.tag || "div";
-  const attributes = (elementNode.attributes || {}) as Record<string, unknown>;
+// 4. Iframe / Embed Elements
+function renderIframe(ctx: RenderCtx) {
+  const { nodeId, tag, attributes, effectiveStyles, outlineClass, handleClick } = ctx;
+  return (
+    <iframe
+      data-node-id={nodeId}
+      data-tag={tag}
+      src={(attributes.src as string) || "about:blank"}
+      title={(attributes.title as string) || "Embed frame"}
+      allowFullScreen={Boolean(attributes.allowFullScreen)}
+      loading={(attributes.loading as "lazy" | "eager") || "lazy"}
+      style={effectiveStyles}
+      onClick={handleClick}
+      className={`${outlineClass} border-0`}
+    />
+  );
+}
 
-  // Common visual selection & hover outline classes
-  const outlineClass = isRoot
-    ? "relative w-full min-h-full cursor-default"
-    : isSelected
-    ? "relative z-10"
-    : "relative hover:outline hover:outline-1 hover:outline-blue-400/40 cursor-pointer";
+// 5. Input Elements (Void)
+function renderInput(ctx: RenderCtx) {
+  const { nodeId, tag, attributes, effectiveStyles, outlineClass, handleClick } = ctx;
+  return (
+    <input
+      data-node-id={nodeId}
+      data-tag={tag}
+      type={(attributes.type as string) || "text"}
+      placeholder={(attributes.placeholder as string) || undefined}
+      defaultValue={(attributes.value as string) || undefined}
+      disabled={Boolean(attributes.disabled)}
+      required={Boolean(attributes.required)}
+      readOnly={Boolean(attributes.readOnly)}
+      style={effectiveStyles}
+      onClick={handleClick}
+      className={outlineClass}
+    />
+  );
+}
 
-  // 1. Image Elements (Void)
-  if (tag === "img") {
-    return (
-      <img
-        data-node-id={nodeId}
-        data-tag={tag}
-        src={
-          (attributes.src as string) ||
-          "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=600&auto=format&fit=crop&q=80"
-        }
-        alt={(attributes.alt as string) || elementNode.name || "Image"}
-        loading={(attributes.loading as "lazy" | "eager") || "lazy"}
-        style={effectiveStyles}
-        onClick={handleClick}
-        className={outlineClass}
-      />
-    );
-  }
+// 6. Textarea Elements
+function renderTextarea(ctx: RenderCtx) {
+  const { nodeId, tag, attributes, effectiveStyles, outlineClass, handleClick } = ctx;
+  return (
+    <textarea
+      data-node-id={nodeId}
+      data-tag={tag}
+      placeholder={(attributes.placeholder as string) || undefined}
+      defaultValue={(attributes.value as string) || undefined}
+      rows={typeof attributes.rows === "number" ? attributes.rows : 3}
+      disabled={Boolean(attributes.disabled)}
+      required={Boolean(attributes.required)}
+      readOnly={Boolean(attributes.readOnly)}
+      style={effectiveStyles}
+      onClick={handleClick}
+      className={outlineClass}
+    />
+  );
+}
 
-  // 2. Video Elements
-  if (tag === "video") {
-    return (
-      <video
-        data-node-id={nodeId}
-        data-tag={tag}
-        src={
-          (attributes.src as string) ||
-          "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
-        }
-        poster={(attributes.poster as string) || undefined}
-        controls={attributes.controls !== false}
-        autoPlay={Boolean(attributes.autoPlay)}
-        loop={Boolean(attributes.loop)}
-        muted={Boolean(attributes.muted)}
-        playsInline={attributes.playsInline !== false}
-        preload={(attributes.preload as "auto" | "metadata" | "none") || "metadata"}
-        style={effectiveStyles}
-        onClick={handleClick}
-        className={outlineClass}
-      />
-    );
-  }
+// 7. Select Elements
+function renderSelect(ctx: RenderCtx) {
+  const { nodeId, tag, attributes, elementNode, effectiveStyles, outlineClass, handleClick } = ctx;
+  return (
+    <select
+      data-node-id={nodeId}
+      data-tag={tag}
+      disabled={Boolean(attributes.disabled)}
+      multiple={Boolean(attributes.multiple)}
+      style={effectiveStyles}
+      onClick={handleClick}
+      className={outlineClass}
+    >
+      {elementNode.children.length > 0 ? renderChildren(ctx) : <option>Option 1</option>}
+    </select>
+  );
+}
 
-  // 3. Audio Elements
-  if (tag === "audio") {
-    return (
-      <audio
-        data-node-id={nodeId}
-        data-tag={tag}
-        src={(attributes.src as string) || undefined}
-        controls={attributes.controls !== false}
-        autoPlay={Boolean(attributes.autoPlay)}
-        loop={Boolean(attributes.loop)}
-        muted={Boolean(attributes.muted)}
-        preload={(attributes.preload as "auto" | "metadata" | "none") || "metadata"}
-        style={effectiveStyles}
-        onClick={handleClick}
-        className={outlineClass}
-      />
-    );
-  }
+// 8a. Horizontal Rule (Void)
+function renderHr(ctx: RenderCtx) {
+  const { nodeId, tag, effectiveStyles, outlineClass, handleClick } = ctx;
+  return (
+    <hr
+      data-node-id={nodeId}
+      data-tag={tag}
+      style={effectiveStyles}
+      onClick={handleClick}
+      className={outlineClass}
+    />
+  );
+}
 
-  // 4. Iframe / Embed Elements
-  if (tag === "iframe") {
-    return (
-      <iframe
-        data-node-id={nodeId}
-        data-tag={tag}
-        src={(attributes.src as string) || "about:blank"}
-        title={(attributes.title as string) || "Embed frame"}
-        allowFullScreen={Boolean(attributes.allowFullScreen)}
-        loading={(attributes.loading as "lazy" | "eager") || "lazy"}
-        style={effectiveStyles}
-        onClick={handleClick}
-        className={`${outlineClass} border-0`}
-      />
-    );
-  }
+// 8b. Line Break (Void)
+function renderBr(ctx: RenderCtx) {
+  const { nodeId, tag } = ctx;
+  return <br data-node-id={nodeId} data-tag={tag} />;
+}
 
-  // 5. Input Elements (Void)
-  if (tag === "input") {
-    return (
-      <input
-        data-node-id={nodeId}
-        data-tag={tag}
-        type={(attributes.type as string) || "text"}
-        placeholder={(attributes.placeholder as string) || undefined}
-        defaultValue={(attributes.value as string) || undefined}
-        disabled={Boolean(attributes.disabled)}
-        required={Boolean(attributes.required)}
-        readOnly={Boolean(attributes.readOnly)}
-        style={effectiveStyles}
-        onClick={handleClick}
-        className={outlineClass}
-      />
-    );
-  }
+// 9. Link Elements
+function renderAnchor(ctx: RenderCtx) {
+  const { nodeId, tag, attributes, elementNode, effectiveStyles, outlineClass, handleClick } = ctx;
+  const textContent = resolveTextContent(ctx, elementNode.name || "Link");
 
-  // 6. Textarea Elements
-  if (tag === "textarea") {
-    return (
-      <textarea
-        data-node-id={nodeId}
-        data-tag={tag}
-        placeholder={(attributes.placeholder as string) || undefined}
-        defaultValue={(attributes.value as string) || undefined}
-        rows={typeof attributes.rows === "number" ? attributes.rows : 3}
-        disabled={Boolean(attributes.disabled)}
-        required={Boolean(attributes.required)}
-        readOnly={Boolean(attributes.readOnly)}
-        style={effectiveStyles}
-        onClick={handleClick}
-        className={outlineClass}
-      />
-    );
-  }
+  return (
+    <a
+      data-node-id={nodeId}
+      data-tag={tag}
+      href={(attributes.href as string) || "#"}
+      target={(attributes.target as string) || undefined}
+      rel={(attributes.rel as string) || undefined}
+      style={effectiveStyles}
+      onClick={handleClick}
+      className={outlineClass}
+    >
+      {elementNode.children.length > 0 ? renderChildren(ctx) : textContent}
+    </a>
+  );
+}
 
-  // 7. Select Elements
-  if (tag === "select") {
-    return (
-      <select
-        data-node-id={nodeId}
-        data-tag={tag}
-        disabled={Boolean(attributes.disabled)}
-        multiple={Boolean(attributes.multiple)}
-        style={effectiveStyles}
-        onClick={handleClick}
-        className={outlineClass}
-      >
-        {elementNode.children.length > 0 ? (
-          elementNode.children.map((childId) => (
-            <ElementRenderer key={childId} nodeId={childId} />
-          ))
-        ) : (
-          <option>Option 1</option>
-        )}
-      </select>
-    );
-  }
+// 10. Button Elements
+function renderButtonTag(ctx: RenderCtx) {
+  const { nodeId, tag, attributes, elementNode, effectiveStyles, outlineClass, handleClick } = ctx;
+  const textContent = resolveTextContent(ctx, elementNode.name || "Button");
 
-  // 8. Horizontal Rule / Break (Void)
-  if (tag === "hr") {
-    return (
-      <hr
-        data-node-id={nodeId}
-        data-tag={tag}
-        style={effectiveStyles}
-        onClick={handleClick}
-        className={outlineClass}
-      />
-    );
-  }
-  if (tag === "br") {
-    return <br data-node-id={nodeId} data-tag={tag} />;
-  }
+  return (
+    <button
+      data-node-id={nodeId}
+      data-tag={tag}
+      type={(attributes.type as "button" | "submit" | "reset") || "button"}
+      disabled={Boolean(attributes.disabled)}
+      style={effectiveStyles}
+      onClick={handleClick}
+      className={outlineClass}
+    >
+      {elementNode.children.length > 0 ? renderChildren(ctx) : textContent}
+    </button>
+  );
+}
 
-  // 9. Link Elements
-  if (tag === "a") {
-    const rawContent = (elementNode as unknown as { content?: string }).content;
-    const rawAttrText = attributes?.textContent as string | undefined;
-    const textContent = typeof rawContent === "string" ? rawContent : typeof rawAttrText === "string" ? rawAttrText : elementNode.name || "Link";
+// 11. Text Elements (p, span, h1-h6, strong, em, etc.)
+function renderTextTag(ctx: RenderCtx) {
+  const { nodeId, tag, elementNode, effectiveStyles, outlineClass, handleClick } = ctx;
+  const textContent = resolveTextContent(
+    ctx,
+    elementNode.children.length === 0 ? elementNode.name || "" : ""
+  );
+  const TextTag = tag as keyof React.JSX.IntrinsicElements;
 
-    return (
-      <a
-        data-node-id={nodeId}
-        data-tag={tag}
-        href={(attributes.href as string) || "#"}
-        target={(attributes.target as string) || undefined}
-        rel={(attributes.rel as string) || undefined}
-        style={effectiveStyles}
-        onClick={handleClick}
-        className={outlineClass}
-      >
-        {elementNode.children.length > 0 ? (
-          elementNode.children.map((childId) => (
-            <ElementRenderer key={childId} nodeId={childId} />
-          ))
-        ) : (
-          textContent
-        )}
-      </a>
-    );
-  }
+  return (
+    <TextTag
+      data-node-id={nodeId}
+      data-tag={tag}
+      style={effectiveStyles}
+      onClick={handleClick}
+      className={outlineClass}
+    >
+      {elementNode.children.length > 0 ? renderChildren(ctx) : textContent}
+    </TextTag>
+  );
+}
 
-  // 10. Button Elements
-  if (tag === "button") {
-    const rawContent = (elementNode as unknown as { content?: string }).content;
-    const rawAttrText = attributes?.textContent as string | undefined;
-    const textContent = typeof rawContent === "string" ? rawContent : typeof rawAttrText === "string" ? rawAttrText : elementNode.name || "Button";
+// 12. Form Elements
+function renderForm(ctx: RenderCtx) {
+  const { nodeId, tag, attributes, elementNode, effectiveStyles, outlineClass, handleClick } = ctx;
 
-    return (
-      <button
-        data-node-id={nodeId}
-        data-tag={tag}
-        type={(attributes.type as "button" | "submit" | "reset") || "button"}
-        disabled={Boolean(attributes.disabled)}
-        style={effectiveStyles}
-        onClick={handleClick}
-        className={outlineClass}
-      >
-        {elementNode.children.length > 0 ? (
-          elementNode.children.map((childId) => (
-            <ElementRenderer key={childId} nodeId={childId} />
-          ))
-        ) : (
-          textContent
-        )}
-      </button>
-    );
-  }
+  return (
+    <form
+      data-node-id={nodeId}
+      data-tag={tag}
+      action={(attributes.action as string) || undefined}
+      method={(attributes.method as string) || "post"}
+      style={effectiveStyles}
+      onClick={handleClick}
+      onSubmit={(e) => e.preventDefault()}
+      className={outlineClass}
+    >
+      {elementNode.children.length > 0 ? (
+        renderChildren(ctx)
+      ) : (
+        <div className="p-4 border border-dashed border-border rounded text-xs text-muted-foreground">
+          Empty Form Container
+        </div>
+      )}
+    </form>
+  );
+}
 
-  // 11. Text Elements (p, span, h1-h6, strong, em, etc.)
-  const isTextTag = [
-    "p",
-    "span",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
-    "strong",
-    "em",
-    "blockquote",
-    "small",
-  ].includes(tag);
-
-  if (isTextTag) {
-    const rawContent = (elementNode as unknown as { content?: string }).content;
-    const rawAttrText = attributes?.textContent as string | undefined;
-    const textContent = typeof rawContent === "string" ? rawContent : typeof rawAttrText === "string" ? rawAttrText : (elementNode.children.length === 0 ? elementNode.name || "" : "");
-
-    const TextTag = tag as keyof React.JSX.IntrinsicElements;
-
-    return (
-      <TextTag
-        data-node-id={nodeId}
-        data-tag={tag}
-        style={effectiveStyles}
-        onClick={handleClick}
-        className={outlineClass}
-      >
-        {elementNode.children.length > 0 ? (
-          elementNode.children.map((childId) => (
-            <ElementRenderer key={childId} nodeId={childId} />
-          ))
-        ) : (
-          textContent
-        )}
-      </TextTag>
-    );
-  }
-
-  // 12. Form Elements
-  if (tag === "form") {
-    return (
-      <form
-        data-node-id={nodeId}
-        data-tag={tag}
-        action={(attributes.action as string) || undefined}
-        method={(attributes.method as string) || "post"}
-        style={effectiveStyles}
-        onClick={handleClick}
-        onSubmit={(e) => e.preventDefault()}
-        className={outlineClass}
-      >
-        {elementNode.children.length > 0 ? (
-          elementNode.children.map((childId) => (
-            <ElementRenderer key={childId} nodeId={childId} />
-          ))
-        ) : (
-          <div className="p-4 border border-dashed border-border rounded text-xs text-muted-foreground">
-            Empty Form Container
-          </div>
-        )}
-      </form>
-    );
-  }
-
-  // 13. Container / Layout Elements (div, section, article, main, header, footer, etc.)
+// 13. Container / Layout Elements (div, section, article, main, header, footer, etc.)
+// Also the fallback for any tag with no dedicated renderer above.
+function renderContainer(ctx: RenderCtx) {
+  const { nodeId, tag, elementNode, effectiveStyles, outlineClass, isRoot, handleClick, handleQuickAdd } = ctx;
   const ContainerTag = tag as keyof React.JSX.IntrinsicElements;
 
   // If Page Root is completely empty, show the starter canvas dropzone
@@ -491,9 +428,152 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
       onClick={handleClick}
       className={outlineClass}
     >
-      {elementNode.children.map((childId) => (
-        <ElementRenderer key={childId} nodeId={childId} />
-      ))}
+      {renderChildren(ctx)}
     </ContainerTag>
   );
+}
+
+const TAG_RENDERERS: Record<string, (ctx: RenderCtx) => React.ReactElement> = {
+  img: renderImg,
+  video: renderVideo,
+  audio: renderAudio,
+  iframe: renderIframe,
+  input: renderInput,
+  textarea: renderTextarea,
+  select: renderSelect,
+  hr: renderHr,
+  br: renderBr,
+  a: renderAnchor,
+  button: renderButtonTag,
+  form: renderForm,
+  p: renderTextTag,
+  span: renderTextTag,
+  h1: renderTextTag,
+  h2: renderTextTag,
+  h3: renderTextTag,
+  h4: renderTextTag,
+  h5: renderTextTag,
+  h6: renderTextTag,
+  strong: renderTextTag,
+  em: renderTextTag,
+  blockquote: renderTextTag,
+  small: renderTextTag,
 };
+
+const ElementRendererComponent: React.FC<ElementRendererProps> = ({
+  nodeId,
+  isRoot = false,
+  depth = 0,
+}) => {
+  const node = useProjectStore((state) => state.project.elements[nodeId]) as
+    | TreeNode
+    | undefined;
+
+  const activeBreakpointId = useEditorStore((state) => state.activeBreakpointId);
+  const activeViewportId = useEditorStore((state) => state.activeViewportId);
+  const viewportWidth = useEditorStore((state) => state.viewportWidth);
+  const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
+  const setSelectedNodeId = useEditorStore((state) => state.setSelectedNodeId);
+  const viewports = useProjectStore((state) => state.project.viewports);
+  const addElementNode = useProjectStore((state) => state.addElementNode);
+
+  if (!node) {
+    return null;
+  }
+
+  if (depth > MAX_RENDER_DEPTH) {
+    return (
+      <div
+        data-node-id={nodeId}
+        className="p-2 text-[11px] text-destructive border border-dashed border-destructive/50 rounded"
+      >
+        Max render depth exceeded — check for a cycle in the document tree.
+      </div>
+    );
+  }
+
+  // Handle component instances or element nodes
+  if (node.type !== "element") {
+    return (
+      <div
+        onClick={(e) => {
+          e.stopPropagation();
+          setSelectedNodeId(nodeId);
+        }}
+        className={`p-3 rounded border border-dashed text-xs text-muted-foreground ${
+          selectedNodeId === nodeId ? "ring-2 ring-primary" : ""
+        }`}
+      >
+        Component: {node.name}
+      </div>
+    );
+  }
+
+  const elementNode = node as ElementNode;
+  const isSelected = selectedNodeId === nodeId;
+
+  const activeViewport =
+    viewports.find((v) => v.id === activeViewportId) ||
+    viewports[0] || { id: "vp-desktop", width: 1440, height: 900, name: "Desktop" };
+
+  const currentDisplayWidth = viewportWidth ?? activeViewport.width;
+
+  const simulatedViewport = {
+    width: currentDisplayWidth,
+    height: activeViewport.height,
+  };
+
+  // Resolve effective style for active breakpoint and simulated viewport
+  const effectiveStyles = resolveEffectiveStyles(
+    elementNode.style,
+    elementNode.breakpointStyles?.[activeBreakpointId],
+    simulatedViewport
+  );
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedNodeId(nodeId);
+  };
+
+  const handleQuickAdd = (tag: "div" | "h1" | "section", name: string) => {
+    const newId = addElementNode({
+      tag,
+      parentId: nodeId,
+      name,
+    });
+    if (newId) {
+      setSelectedNodeId(newId);
+    }
+  };
+
+  const tag = elementNode.tag || "div";
+  const attributes = (elementNode.attributes || {}) as Record<string, unknown>;
+
+  // Common visual selection & hover outline classes
+  const outlineClass = isRoot
+    ? "relative w-full min-h-full cursor-default"
+    : isSelected
+    ? "relative z-10"
+    : "relative hover:outline hover:outline-1 hover:outline-blue-400/40 cursor-pointer";
+
+  const ctx: RenderCtx = {
+    nodeId,
+    tag,
+    elementNode,
+    attributes,
+    effectiveStyles,
+    outlineClass,
+    isRoot,
+    depth,
+    handleClick,
+    handleQuickAdd,
+  };
+
+  const renderer = TAG_RENDERERS[tag] || renderContainer;
+  return renderer(ctx);
+};
+
+// Memoized so a parent re-render (e.g. CanvasContainer reacting to zoom/pan)
+// doesn't force-recurse into every node in the tree — only nodes whose own
+// props (nodeId/isRoot/depth) actually changed re-render.
+export const ElementRenderer = React.memo(ElementRendererComponent);

@@ -12,7 +12,7 @@
 
 "use client";
 
-import React, { useRef, useState, useCallback, useMemo } from "react";
+import React, { useRef, useState, useCallback, useMemo, useEffect } from "react";
 import { CanvasRenderer } from "./CanvasRenderer";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { DropIndicatorOverlay } from "./DropIndicatorOverlay";
@@ -22,11 +22,14 @@ import { useProjectStore } from "@/store/project";
 import { useEditorKeyboardShortcuts } from "@/hooks/useEditorKeyboardShortcuts";
 import {
   computeDropResult,
+  gatherDropContext,
   getGlobalDraggedDefinition,
   setGlobalDraggedDefinition,
   type DropTargetResult,
 } from "@/lib/dropTargetResolution";
 import type { ElementDefinitionItem } from "@/lib/elementDefinitions";
+import { generateTokenCssVars } from "@/lib/styleUtils";
+import { screenDeltaToDocumentDelta } from "@/lib/canvasCoordinates";
 
 export const CanvasContainer: React.FC = () => {
   // Activate keyboard shortcuts (nudge, delete, duplicate, undo/redo)
@@ -46,8 +49,6 @@ export const CanvasContainer: React.FC = () => {
 
   const viewports = useProjectStore((state) => state.project.viewports);
   const breakpoints = useProjectStore((state) => state.project.breakpoints);
-  const pages = useProjectStore((state) => state.project.pages);
-  const elements = useProjectStore((state) => state.project.elements);
   const projectStyles = useProjectStore((state) => state.project.styles);
   const updateViewport = useProjectStore((state) => state.updateViewport);
   const addElementNode = useProjectStore((state) => state.addElementNode);
@@ -61,6 +62,17 @@ export const CanvasContainer: React.FC = () => {
   const [isDraggingHandle, setIsDraggingHandle] = useState<"left" | "right" | null>(null);
   const [isPanningInProgress, setIsPanningInProgress] = useState(false);
 
+  // Window-level pointer listeners registered by an in-progress gesture
+  // (pan / viewport-resize) are normally torn down on pointerup, but a
+  // component unmount mid-gesture (route change, project switch) would
+  // otherwise leak them — this runs whichever cleanup is still pending.
+  const activeGestureCleanupRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    return () => {
+      activeGestureCleanupRef.current?.();
+    };
+  }, []);
+
   // Transient drag-and-drop indicator state
   const [dropTarget, setDropTarget] = useState<DropTargetResult | null>(null);
   const [activeDraggedItem, setActiveDraggedItem] = useState<ElementDefinitionItem | null>(null);
@@ -72,55 +84,10 @@ export const CanvasContainer: React.FC = () => {
   const currentDisplayWidth = viewportWidth ?? activeViewport.width;
 
   // Generate CSS variables for all project design tokens
-  const tokenCssVars: Record<string, string> = useMemo(() => {
-    const vars: Record<string, string> = {};
-    if (!projectStyles) return vars;
-
-    // Colors: --color-[name]
-    if (projectStyles.colors) {
-      for (const [k, v] of Object.entries(projectStyles.colors)) {
-        vars[`--color-${k}`] = v;
-      }
-    }
-
-    // Spacing: --spacing-[name]
-    if (projectStyles.spacing) {
-      for (const [k, v] of Object.entries(projectStyles.spacing)) {
-        vars[`--spacing-${k}`] = typeof v === "number" ? `${v}px` : String(v);
-      }
-    }
-
-    // Radii: --radius-[name]
-    if (projectStyles.radii) {
-      for (const [k, v] of Object.entries(projectStyles.radii)) {
-        vars[`--radius-${k}`] = typeof v === "number" ? `${v}px` : String(v);
-      }
-    }
-
-    // Shadows: --shadow-[name]
-    if (projectStyles.shadows) {
-      for (const [k, v] of Object.entries(projectStyles.shadows)) {
-        vars[`--shadow-${k}`] = v;
-      }
-    }
-
-    // Fonts: --font-[name]
-    if (projectStyles.fonts) {
-      for (const [k, v] of Object.entries(projectStyles.fonts)) {
-        vars[`--font-${k}`] = v.fallback ? `${v.family}, ${v.fallback}` : v.family;
-      }
-    }
-
-    // Variables: --[name]
-    if (projectStyles.variables) {
-      for (const [k, v] of Object.entries(projectStyles.variables)) {
-        const name = k.startsWith("--") ? k : `--${k}`;
-        vars[name] = typeof v === "number" ? `${v}px` : String(v);
-      }
-    }
-
-    return vars;
-  }, [projectStyles]);
+  const tokenCssVars: Record<string, string> = useMemo(
+    () => generateTokenCssVars(projectStyles),
+    [projectStyles]
+  );
 
   const handleCanvasBackgroundClick = (e: React.MouseEvent) => {
     // Only deselect if clicked directly on the backdrop area and not in pan mode
@@ -135,6 +102,7 @@ export const CanvasContainer: React.FC = () => {
     if (!scrollContainerRef.current) return;
 
     e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
     setIsPanningInProgress(true);
 
     const startX = e.clientX;
@@ -150,16 +118,23 @@ export const CanvasContainer: React.FC = () => {
       scrollContainerRef.current.scrollTop = startScrollTop - dy;
     };
 
-    const handlePointerUp = () => {
+    const handlePointerUp = (upEvent: PointerEvent) => {
+      try {
+        e.currentTarget.releasePointerCapture(upEvent.pointerId);
+      } catch {
+        // Pointer capture already released
+      }
       setIsPanningInProgress(false);
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
       window.removeEventListener("pointercancel", handlePointerUp);
+      activeGestureCleanupRef.current = null;
     };
 
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", handlePointerUp);
     window.addEventListener("pointercancel", handlePointerUp);
+    activeGestureCleanupRef.current = () => handlePointerUp(new PointerEvent("pointercancel"));
   };
 
   // Helper to match breakpoint given a width
@@ -187,7 +162,7 @@ export const CanvasContainer: React.FC = () => {
     const centerX = rect.left + rect.width / 2;
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
-      const distFromCenter = Math.abs(moveEvent.clientX - centerX) / (zoom || 1);
+      const distFromCenter = Math.abs(screenDeltaToDocumentDelta(moveEvent.clientX - centerX, zoom));
       const newWidth = Math.min(2560, Math.max(320, Math.round(distFromCenter * 2)));
 
       setViewportWidth(newWidth);
@@ -205,6 +180,7 @@ export const CanvasContainer: React.FC = () => {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
       window.removeEventListener("pointercancel", handlePointerUp);
+      activeGestureCleanupRef.current = null;
 
       setIsDraggingHandle(null);
 
@@ -219,6 +195,7 @@ export const CanvasContainer: React.FC = () => {
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", handlePointerUp);
     window.addEventListener("pointercancel", handlePointerUp);
+    activeGestureCleanupRef.current = () => handlePointerUp(new PointerEvent("pointercancel"));
   };
 
   // ============================================================
@@ -235,13 +212,19 @@ export const CanvasContainer: React.FC = () => {
 
     setActiveDraggedItem(dragged);
 
+    // Read on-demand rather than subscribing — the whole tree is only
+    // needed inside this handler, never for render, so there's no reason
+    // for an edit anywhere in the document to re-render this component.
+    const { pages, elements } = useProjectStore.getState().project;
     const activePage = pages[activePageId] || Object.values(pages)[0];
     const rootId = activePage?.rootElementId || "root";
 
+    const { containerRect, candidates } = gatherDropContext(viewportRef.current, elements);
     const result = computeDropResult({
       clientX: e.clientX,
       clientY: e.clientY,
-      viewportElement: viewportRef.current,
+      containerRect,
+      candidates,
       zoom,
       elements,
       activePageRootId: rootId,
@@ -280,13 +263,16 @@ export const CanvasContainer: React.FC = () => {
       return;
     }
 
+    const { pages, elements } = useProjectStore.getState().project;
     const activePage = pages[activePageId] || Object.values(pages)[0];
     const rootId = activePage?.rootElementId || "root";
 
+    const { containerRect, candidates } = gatherDropContext(viewportRef.current, elements);
     const result = computeDropResult({
       clientX: e.clientX,
       clientY: e.clientY,
-      viewportElement: viewportRef.current,
+      containerRect,
+      candidates,
       zoom,
       elements,
       activePageRootId: rootId,

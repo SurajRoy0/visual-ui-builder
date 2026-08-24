@@ -16,13 +16,14 @@ import { ElementRenderer } from "./ElementRenderer";
 export const CanvasRenderer: React.FC = () => {
   const activePageId = useEditorStore((state) => state.activePageId);
   const pages = useProjectStore((state) => state.project.pages);
-  const elements = useProjectStore((state) => state.project.elements);
 
   const activePage = pages[activePageId] || Object.values(pages)[0];
   const rootElementId = activePage?.rootElementId || "root";
 
+  const rootElementExists = useProjectStore((state) => Boolean(state.project.elements[rootElementId]));
+
   // If root element exists, render it
-  if (elements[rootElementId]) {
+  if (rootElementExists) {
     return (
       <div className="w-full min-h-full flex-1 flex flex-col">
         <ElementRenderer nodeId={rootElementId} isRoot />

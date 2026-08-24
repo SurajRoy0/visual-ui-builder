@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useId } from "react";
+import React, { useId, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export type CSSUnit = "px" | "%" | "rem" | "em" | "vw" | "vh" | "auto" | "none" | "fr" | "pt";
+export type CSSUnit = "px" | "%" | "rem" | "em" | "vw" | "vh" | "auto" | "none" | "fr" | "pt" | "deg";
 
 export interface UnitInputProps {
   id?: string;
@@ -50,7 +50,7 @@ export function parseValueAndUnit(raw: string | number | undefined, defaultUnit:
   }
 
   // Regex matching number and optional unit suffix
-  const match = str.match(/^(-?[\d.]+)\s*(px|%|rem|em|vw|vh|fr|pt)?$/);
+  const match = str.match(/^(-?[\d.]+)\s*(px|%|rem|em|vw|vh|fr|pt|deg)?$/);
   if (match) {
     const num = match[1];
     const u = (match[2] as CSSUnit) || defaultUnit;
@@ -87,7 +87,15 @@ export const UnitInput: React.FC<UnitInputProps> = ({
   const currentUnit: CSSUnit = unit || parsed.unit;
   const currentNumeric = currentUnit === "auto" || currentUnit === "none" ? "" : parsed.numericValue;
 
-  const handleNumberChange = (rawInput: string) => {
+  // Local draft buffer while actively typing. Keystrokes only update this;
+  // the store commit (onChange/onValueChange) fires on blur/Enter, not per
+  // character. `null` means "not editing" — display follows the `value`
+  // prop directly, so external changes (undo, selection switch) still show
+  // immediately.
+  const [draftText, setDraftText] = useState<string | null>(null);
+  const displayNumeric = draftText !== null ? draftText : currentNumeric;
+
+  const sanitizeNumeric = (rawInput: string): string => {
     // Sanitize: strictly allow only numbers, decimal point, and optional leading negative sign
     let clean = rawInput.replace(/[^0-9.-]/g, "");
 
@@ -106,6 +114,10 @@ export const UnitInput: React.FC<UnitInputProps> = ({
       clean = clean.replace(/-/g, "");
     }
 
+    return clean;
+  };
+
+  const commitNumeric = (clean: string) => {
     const newUnit = currentUnit === "auto" || currentUnit === "none" ? (units[0] === "auto" ? "px" : units[0]) : currentUnit;
 
     const formatted = clean === "" ? "" : `${clean}${newUnit}`;
@@ -118,31 +130,59 @@ export const UnitInput: React.FC<UnitInputProps> = ({
     }
   };
 
+  const handleNumberInput = (rawInput: string) => {
+    setDraftText(sanitizeNumeric(rawInput));
+  };
+
+  const handleBlur = () => {
+    if (draftText !== null) {
+      commitNumeric(draftText);
+      setDraftText(null);
+    }
+  };
+
   const handleUnitChange = (newUnit: CSSUnit) => {
+    const num = draftText !== null ? draftText : currentNumeric || "0";
+    setDraftText(null);
+
     let formatted = "";
     if (newUnit === "auto") {
       formatted = "auto";
     } else if (newUnit === "none") {
       formatted = "none";
     } else {
-      const num = currentNumeric || "0";
-      formatted = `${num}${newUnit}`;
+      formatted = `${num || "0"}${newUnit}`;
     }
 
     if (onChange) {
       onChange(formatted);
     }
     if (onValueChange) {
-      onValueChange(currentNumeric, newUnit);
+      onValueChange(num, newUnit);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (currentUnit === "auto" || currentUnit === "none" || disabled) return;
 
+    if (e.key === "Enter") {
+      if (draftText !== null) {
+        commitNumeric(draftText);
+        setDraftText(null);
+      }
+      e.currentTarget.blur();
+      return;
+    }
+
+    if (e.key === "Escape") {
+      setDraftText(null);
+      e.currentTarget.blur();
+      return;
+    }
+
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
       e.preventDefault();
-      const currentNum = parseFloat(currentNumeric) || 0;
+      const currentNum = parseFloat(draftText !== null ? draftText : currentNumeric) || 0;
       const stepMultiplier = e.shiftKey ? 10 : 1;
       const delta = (e.key === "ArrowUp" ? step : -step) * stepMultiplier;
       let nextNum = currentNum + delta;
@@ -150,9 +190,11 @@ export const UnitInput: React.FC<UnitInputProps> = ({
       if (min !== undefined) nextNum = Math.max(min, nextNum);
       if (max !== undefined) nextNum = Math.min(max, nextNum);
 
-      // Round to 2 decimal places to avoid float precision issues
+      // Round to 2 decimal places to avoid float precision issues, and
+      // commit immediately — each arrow press is its own deliberate step.
       const formattedNum = String(Math.round(nextNum * 100) / 100);
-      handleNumberChange(formattedNum);
+      setDraftText(null);
+      commitNumeric(formattedNum);
     }
   };
 
@@ -184,9 +226,10 @@ export const UnitInput: React.FC<UnitInputProps> = ({
         type="text"
         inputMode="decimal"
         disabled={disabled || isKeywordUnit}
-        value={isKeywordUnit ? currentUnit : currentNumeric}
+        value={isKeywordUnit ? currentUnit : displayNumeric}
         placeholder={isKeywordUnit ? currentUnit : placeholder}
-        onChange={(e) => handleNumberChange(e.target.value)}
+        onChange={(e) => handleNumberInput(e.target.value)}
+        onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         className={cn(
           "w-full h-full bg-transparent px-2 text-xs font-mono text-foreground placeholder:text-muted-foreground/60 outline-none border-none",

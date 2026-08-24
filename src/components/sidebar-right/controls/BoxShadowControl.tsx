@@ -99,15 +99,28 @@ export const BoxShadowControl: React.FC<BoxShadowControlProps> = ({
     return `${prefix}${opts.x}px ${opts.y}px ${opts.blur}px ${opts.spread}px ${opts.color}`;
   };
 
-  const handleSliderChange = (
+  // Live-drag preview only (Section 15: no store write per pointer/drag
+  // tick) — the store only gets one commit, via each Slider's
+  // onValueCommit, when the drag ends.
+  const [draft, setDraft] = useState<typeof parsed | null>(null);
+  const display = draft ?? parsed;
+  const previewShadow = draft ? assembleShadow(draft) : value;
+  const [rawDraft, setRawDraft] = useState<string | null>(null);
+
+  const previewSlider = (
     param: "x" | "y" | "blur" | "spread",
     val: number
   ) => {
-    const updated = {
-      ...parsed,
-      [param]: val,
-    };
+    setDraft({ ...display, [param]: val });
+  };
+
+  const commitSlider = (
+    param: "x" | "y" | "blur" | "spread",
+    val: number
+  ) => {
+    const updated = { ...display, [param]: val };
     onChange(assembleShadow(updated));
+    setDraft(null);
   };
 
   const handleInsetToggle = (checked: boolean) => {
@@ -118,14 +131,16 @@ export const BoxShadowControl: React.FC<BoxShadowControlProps> = ({
     onChange(assembleShadow(updated));
   };
 
-  const handleOpacityChange = (opacityPercent: number) => {
+  const previewOpacity = (opacityPercent: number) => {
     const a = (opacityPercent / 100).toFixed(2);
-    const rgba = `rgba(0, 0, 0, ${a})`;
-    const updated = {
-      ...parsed,
-      color: rgba,
-    };
+    setDraft({ ...display, opacity: opacityPercent, color: `rgba(0, 0, 0, ${a})` });
+  };
+
+  const commitOpacity = (opacityPercent: number) => {
+    const a = (opacityPercent / 100).toFixed(2);
+    const updated = { ...display, opacity: opacityPercent, color: `rgba(0, 0, 0, ${a})` };
     onChange(assembleShadow(updated));
+    setDraft(null);
   };
 
   const handleSelectPreset = (presetVal: string) => {
@@ -168,7 +183,7 @@ export const BoxShadowControl: React.FC<BoxShadowControlProps> = ({
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <div
               className="size-4 rounded-xs border border-border/80 bg-card shrink-0"
-              style={{ boxShadow: value && value !== "none" ? value : undefined }}
+              style={{ boxShadow: previewShadow && previewShadow !== "none" ? previewShadow : undefined }}
             />
             <span className="truncate font-mono text-[11px] text-foreground">
               {displayLabel}
@@ -182,7 +197,7 @@ export const BoxShadowControl: React.FC<BoxShadowControlProps> = ({
           <div className="h-20 rounded-lg bg-secondary/40 border border-border/60 flex items-center justify-center">
             <div
               className="px-4 py-1.5 rounded bg-card border border-border text-[10px] font-medium text-foreground transition-all duration-150"
-              style={{ boxShadow: value && value !== "none" ? value : undefined }}
+              style={{ boxShadow: previewShadow && previewShadow !== "none" ? previewShadow : undefined }}
             >
               Shadow Preview
             </div>
@@ -207,14 +222,15 @@ export const BoxShadowControl: React.FC<BoxShadowControlProps> = ({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-muted-foreground">X Offset</span>
-                  <span className="font-mono text-foreground">{parsed.x}px</span>
+                  <span className="font-mono text-foreground">{display.x}px</span>
                 </div>
                 <Slider
                   min={-50}
                   max={50}
                   step={1}
-                  value={[parsed.x]}
-                  onValueChange={(v) => handleSliderChange("x", Array.isArray(v) ? v[0] : (typeof v === "number" ? v : 0))}
+                  value={[display.x]}
+                  onValueChange={(v) => previewSlider("x", Array.isArray(v) ? v[0] : (typeof v === "number" ? v : 0))}
+                  onValueCommitted={(v) => commitSlider("x", Array.isArray(v) ? v[0] : (typeof v === "number" ? v : 0))}
                   className="py-1"
                 />
               </div>
@@ -222,14 +238,15 @@ export const BoxShadowControl: React.FC<BoxShadowControlProps> = ({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-muted-foreground">Y Offset</span>
-                  <span className="font-mono text-foreground">{parsed.y}px</span>
+                  <span className="font-mono text-foreground">{display.y}px</span>
                 </div>
                 <Slider
                   min={-50}
                   max={50}
                   step={1}
-                  value={[parsed.y]}
-                  onValueChange={(v) => handleSliderChange("y", Array.isArray(v) ? v[0] : (typeof v === "number" ? v : 0))}
+                  value={[display.y]}
+                  onValueChange={(v) => previewSlider("y", Array.isArray(v) ? v[0] : (typeof v === "number" ? v : 0))}
+                  onValueCommitted={(v) => commitSlider("y", Array.isArray(v) ? v[0] : (typeof v === "number" ? v : 0))}
                   className="py-1"
                 />
               </div>
@@ -238,14 +255,15 @@ export const BoxShadowControl: React.FC<BoxShadowControlProps> = ({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-muted-foreground">Blur Radius</span>
-                  <span className="font-mono text-foreground">{parsed.blur}px</span>
+                  <span className="font-mono text-foreground">{display.blur}px</span>
                 </div>
                 <Slider
                   min={0}
                   max={80}
                   step={1}
-                  value={[parsed.blur]}
-                  onValueChange={(v) => handleSliderChange("blur", Array.isArray(v) ? v[0] : (typeof v === "number" ? v : 0))}
+                  value={[display.blur]}
+                  onValueChange={(v) => previewSlider("blur", Array.isArray(v) ? v[0] : (typeof v === "number" ? v : 0))}
+                  onValueCommitted={(v) => commitSlider("blur", Array.isArray(v) ? v[0] : (typeof v === "number" ? v : 0))}
                   className="py-1"
                 />
               </div>
@@ -253,14 +271,15 @@ export const BoxShadowControl: React.FC<BoxShadowControlProps> = ({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-muted-foreground">Spread Radius</span>
-                  <span className="font-mono text-foreground">{parsed.spread}px</span>
+                  <span className="font-mono text-foreground">{display.spread}px</span>
                 </div>
                 <Slider
                   min={-30}
                   max={40}
                   step={1}
-                  value={[parsed.spread]}
-                  onValueChange={(v) => handleSliderChange("spread", Array.isArray(v) ? v[0] : (typeof v === "number" ? v : 0))}
+                  value={[display.spread]}
+                  onValueChange={(v) => previewSlider("spread", Array.isArray(v) ? v[0] : (typeof v === "number" ? v : 0))}
+                  onValueCommitted={(v) => commitSlider("spread", Array.isArray(v) ? v[0] : (typeof v === "number" ? v : 0))}
                   className="py-1"
                 />
               </div>
@@ -271,21 +290,22 @@ export const BoxShadowControl: React.FC<BoxShadowControlProps> = ({
                   <span className="text-[11px] font-medium text-foreground">Inner Shadow (Inset)</span>
                   <span className="text-[9px] text-muted-foreground">Render inside element boundary</span>
                 </div>
-                <Switch checked={parsed.isInset} onCheckedChange={handleInsetToggle} />
+                <Switch checked={display.isInset} onCheckedChange={handleInsetToggle} />
               </div>
 
               {/* Shadow Opacity */}
               <div className="space-y-1.5 pt-1 border-t border-border/50">
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-muted-foreground">Shadow Darkness</span>
-                  <span className="font-mono text-foreground">{parsed.opacity}%</span>
+                  <span className="font-mono text-foreground">{display.opacity}%</span>
                 </div>
                 <Slider
                   min={1}
                   max={100}
                   step={1}
-                  value={[parsed.opacity]}
-                  onValueChange={(v) => handleOpacityChange(Array.isArray(v) ? v[0] : (typeof v === "number" ? v : 20))}
+                  value={[display.opacity]}
+                  onValueChange={(v) => previewOpacity(Array.isArray(v) ? v[0] : (typeof v === "number" ? v : 20))}
+                  onValueCommitted={(v) => commitOpacity(Array.isArray(v) ? v[0] : (typeof v === "number" ? v : 20))}
                   className="py-1"
                 />
               </div>
@@ -358,8 +378,26 @@ export const BoxShadowControl: React.FC<BoxShadowControlProps> = ({
               <div className="space-y-1">
                 <Label className="text-[11px] text-muted-foreground">Custom CSS box-shadow</Label>
                 <Input
-                  value={value || ""}
-                  onChange={(e) => onChange(e.target.value)}
+                  value={rawDraft ?? (value || "")}
+                  onChange={(e) => setRawDraft(e.target.value)}
+                  onBlur={() => {
+                    if (rawDraft !== null) {
+                      onChange(rawDraft);
+                      setRawDraft(null);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      if (rawDraft !== null) {
+                        onChange(rawDraft);
+                        setRawDraft(null);
+                      }
+                      e.currentTarget.blur();
+                    } else if (e.key === "Escape") {
+                      setRawDraft(null);
+                      e.currentTarget.blur();
+                    }
+                  }}
                   placeholder="e.g. 0 10px 25px -5px rgba(0,0,0,0.2)"
                   className="h-8 text-xs font-mono"
                 />

@@ -12,17 +12,20 @@
 
 import React from "react";
 import type { DropTargetResult } from "@/lib/dropTargetResolution";
-import type { ElementDefinitionItem } from "@/lib/elementDefinitions";
 import { AlertCircle, CornerDownRight, Ban } from "lucide-react";
 
 interface DropIndicatorOverlayProps {
   dropTarget: DropTargetResult | null;
-  draggedItem: ElementDefinitionItem | null;
+  /** Only `.tag` is actually read here — a toolbox definition or a bare tag both work. */
+  draggedItem: { tag: string } | null;
+  /** "Insert" for toolbox-create drags, "Move" for existing-node drags. */
+  actionVerb?: string;
 }
 
 export const DropIndicatorOverlay: React.FC<DropIndicatorOverlayProps> = ({
   dropTarget,
   draggedItem,
+  actionVerb = "Insert",
 }) => {
   if (!dropTarget || !draggedItem) {
     return null;
@@ -60,12 +63,12 @@ export const DropIndicatorOverlay: React.FC<DropIndicatorOverlayProps> = ({
             {allowed ? (
               <>
                 <CornerDownRight className="size-3" />
-                <span>Insert &lt;{draggedItem.tag}&gt; inside</span>
+                <span>{actionVerb} &lt;{draggedItem.tag}&gt; inside</span>
               </>
             ) : (
               <>
                 <Ban className="size-3 text-white" />
-                <span>{reason || `Cannot insert <${draggedItem.tag}> here`}</span>
+                <span>{reason || `Cannot ${actionVerb.toLowerCase()} <${draggedItem.tag}> here`}</span>
               </>
             )}
           </div>
@@ -119,7 +122,7 @@ export const DropIndicatorOverlay: React.FC<DropIndicatorOverlayProps> = ({
         >
           {allowed ? (
             <span>
-              Insert &lt;{draggedItem.tag}&gt; ({mode})
+              {actionVerb} &lt;{draggedItem.tag}&gt; ({mode})
             </span>
           ) : (
             <span className="flex items-center gap-1">

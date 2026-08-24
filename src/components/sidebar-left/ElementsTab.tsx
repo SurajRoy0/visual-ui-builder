@@ -51,24 +51,21 @@ export const ElementsTab: React.FC = () => {
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<{ id: string; tagName: string; reason: string } | null>(null);
 
-  const {
-    project,
-    addElementNode,
-    updateNodeStyle,
-    updateTextContent,
-    updateNodeAttributes,
-  } = useProjectStore();
+  const addElementNode = useProjectStore((state) => state.addElementNode);
+  const updateNodeStyle = useProjectStore((state) => state.updateNodeStyle);
+  const updateTextContent = useProjectStore((state) => state.updateTextContent);
+  const updateNodeAttributes = useProjectStore((state) => state.updateNodeAttributes);
 
-  const {
-    selectedNodeId,
-    activePageId,
-    setSelectedNodeId,
-  } = useEditorStore();
+  const selectedNodeId = useEditorStore((state) => state.selectedNodeId);
+  const activePageId = useEditorStore((state) => state.activePageId);
+  const setSelectedNodeId = useEditorStore((state) => state.setSelectedNodeId);
 
   // Find target parent ID (selected element if valid, otherwise active page root, or 'root')
-  const activePage = project.pages[activePageId];
+  const activePage = useProjectStore((state) => state.project.pages[activePageId]);
   const defaultParentId = activePage?.rootElementId ?? "root";
-  const targetParentNode = selectedNodeId ? project.elements[selectedNodeId] : null;
+  const targetParentNode = useProjectStore((state) =>
+    selectedNodeId ? state.project.elements[selectedNodeId] : null
+  );
   const effectiveParentId = targetParentNode ? targetParentNode.id : defaultParentId;
 
   const handleAddElement = (item: ElementDefinitionItem) => {
